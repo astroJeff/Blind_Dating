@@ -5,7 +5,19 @@ using namespace std;
 
 #define N_CALC 100
 
+// Model Parameters
+#define N_GAUSS 4    /* Number of Gaussians for WD distribution */
+#define WD_DIST 1    /* 1-Gaussians, 2-Uniform */
+#define WD_M_MIN 0.3 /* Minimum WD mass for flat distribution */
+#define WD_M_MAX 1.2 /* Maximum WD mass for flat distribution */
 
+// NS Gaussian Parameters
+#define NS_RATE 0.2  /* Percent of stars that are NS */
+#define NS_M 1.35    /* NS mean mass adopted  */
+#define NS_SD 0.02   /* NS standard deviation adopted  */
+
+
+// Constants
 #define PI acos(-1.0)
 #define GGG 1.536e6  /* Newton's Gravitational Constant in (km/s)^3 days Msun^(-1) */
 
@@ -16,6 +28,7 @@ using namespace std;
 #define FAC (1.0/MBIG)
 #define MAXIT 100
 
+void create_gauss_dist(double* M,double* sd,double* w);
 void find_M2(double M2, double* f, double* df, double* model);
 double get_inc(long *seed);
 

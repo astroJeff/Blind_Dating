@@ -14,7 +14,6 @@ long N_reject=0;
 int main(int argc, char* argv[]){
 
   int j,index;
-  int N_GAUSS;
   long i,seed;
 
   double temp_ran,temp_prob;
@@ -22,95 +21,129 @@ int main(int argc, char* argv[]){
   
   double model[3];
 
-  double M0[4];
-  double sd[4];
-  double w[4];
+  double *w,*sd,*M0;
+
 
   ofstream OUT;
   
   OUT.open("dist_gaus.dat");
   
   seed = time(NULL);
+
+
+
+
+  if(WD_DIST == 1){
+    M0 = new double[N_GAUSS];
+    sd = new double[N_GAUSS];
+    w = new double[N_GAUSS];
+    create_gauss_dist(M0,sd,w);
+  }
   
+  OUT << "M1  Porb K  M2(actual) M2_min" << endl;
 
-  N_GAUSS = 4;
 
-  M0[0] = 0.4;
-  M0[1] = 0.7;
-  M0[2] = 0.9;
-  M0[3] = 1.25;
-
-  
-  w[0] = 0.1;
-  w[1] = 0.4;
-  w[2] = 0.3;
-  w[3] = 0.2;
-  
-
-  /*
-  w[0] = 0.0;
-  w[1] = 1.0;
-  w[2] = 0.0;
-  //  w[3] = 1.0;
-  */
-
-  sd[0] = 0.05;
-  sd[1] = 0.2;
-  sd[2] = 0.05;
-  sd[3] = 0.02;
-
+  // System parameters
   M1 = 0.25;
-  Porb = 0.5;
-
-
+  Porb = 0.5;  // Assume a half-day orbit
+  
+  
   // Iterate for N_CALC times
   for(i=0;i<N_CALC;i++){
-
-    index = 0;
+    
     temp_ran = ran3(&seed);
-    temp_prob = 0.0;
     
-    // To pick which gaussian to choose from
-    for(j=0;j<N_GAUSS;j++){
-      temp_prob += w[j];
-      if(temp_ran>temp_prob)  index = j+1;
-    }    
-    index = 1;
-
-    //      if(temp_ran<w[0]){ index=0;
-    //      }else if(temp_ran < w[0]+w[1]){ index=1;
-    //      }else if(temp_ran < w[0]+w[1]+w[2]){ index=2;
-    //      }else{ index=3;}
-
-    M2 = gauss_ran(M0[index],sd[index],&seed);
     
+    if (temp_ran < NS_RATE){    // NS Distribution
 
+      M2 = gauss_ran(NS_M,NS_SD,&seed);
+      
+    }else {                     // WD Distribution
+
+      if(WD_DIST == 1){
+	index = 0;
+	temp_prob = 0.0;     
+	temp_ran = ran3(&seed);
+	
+	// To pick which gaussian to choose from
+	for(j=0;j<N_GAUSS;j++){
+	  temp_prob += w[j];
+	  if(temp_ran>temp_prob)  index = j+1;
+	}    
+	
+	M2 = gauss_ran(M0[index],sd[index],&seed);
+	
+      }else {
+	M2 = ran3(&seed) * (WD_M_MAX-WD_M_MIN) + WD_M_MIN;
+      }
+      
+    }
+    
     // Check with M2_min distribution??
     // Get a random inclination angle
     inc = get_inc(&seed);
-
+    
     // Determine what the relative orbital velocity will be
     vel = M2 * sin(inc) * pow( 1.0 / ((M1+M2)*(M1+M2)) * 2.0 * PI * GGG / Porb, 1.0/3.0);
-
+    
     // Then get the mass function
     Mf = Porb * vel*vel*vel / (2.0*PI*GGG);
-
+    
     // Then solve for the apparent M2_min
     model[0] = M1;
     model[1] = Mf;
     model[2] = PI/2.0;  // inclination set to 90 degrees for M2_min
     M2_min = rtsafe(find_M2,0.0,10.0,1.0e-5,model);
-
-    OUT << M2 << " " << M2_min << endl;
+    
+    OUT << M1 << " " << Porb << " " << vel << " " << M2 << " " << M2_min << endl;
     
   }
   
   OUT.close();
+  
+  if(WD_DIST == 1){
+    delete[] M0;
+    delete[] sd;
+    delete[] w;
+  }
 
 }
 
 
+void create_gauss_dist(double* M,double* sd,double* w){
+  int i;
+  double weight;
+  
+  // Gaussian mixture model
+  for(i=0;i<N_GAUSS;i++){
+      
+      if(i==0){
+	M[i] = 0.7;
+	w[i] = 0.4;
+	sd[i] = 0.2;
+      }
+      
+      if(i==1){
+	M[i] = 0.9;
+	w[i] = 0.2;
+	sd[i] = 0.05;
+      }
 
+      if(i==2){
+	M[i] = 0.5;
+	w[i] = 0.2;
+	sd[i] = 0.1;
+      }
+      
+    }
+	
+	// To normalize Gaussians
+	weight = 0.0;
+      for(i=0;i<N_GAUSS;i++) weight += w[i];
+      for(i=0;i<N_GAUSS;i++) w[i] /= weight;
+      
+      }
+  
 
 
 void find_M2(double M2, double* f, double* df, double* model){
