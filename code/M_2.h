@@ -4,7 +4,7 @@
 using namespace std;
 
 #define N_CALC 100
-#define BURN_IN 0
+#define BURN_IN 100
 // #define M_DELTA 0.0002
 // #define C_DELTA 0.0005
 // #define SD_DELTA 0.0005
@@ -49,7 +49,7 @@ void rk4(double *y, double *dydx, int n, double x, double h, double *yout, doubl
 
 void find_M2(double M2, double* f, double* df, double* model);
 double eval_M2(double M2, double* model);
-void integrate_M2(double M2, double* var, double* derivs, double* model);
+void integrate_M2(double M2, double* f, double* df, double* model);
 void find_range(vector<double>& in_array,double* x_out,double* x_l,double* x_u);
 
 
