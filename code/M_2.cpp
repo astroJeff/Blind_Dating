@@ -10,8 +10,6 @@
 
 using namespace std;
 
-long N_accept=0;
-long N_reject=0;
 
 int main(int argc, char* argv[]){
 
@@ -21,9 +19,9 @@ int main(int argc, char* argv[]){
   long i,seed;
 
 
-  double mu[4];
-  double sd[4];
-  double w[4];
+  double mu[N_GAUSS];
+  double sd[N_GAUSS];
+  double w[N_GAUSS];
 
   ofstream OUT;
   
@@ -94,9 +92,6 @@ int main(int argc, char* argv[]){
   
 
 
-  cout << "Number Accepted = " << N_accept << endl;
-  cout << " Number Rejected = " << N_reject << endl;
-
   OUT.close();
 
 }
@@ -108,22 +103,33 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
   double Mf;
   double model[3];
 
+  for(i=0;i<N_GAUSS;i++){
+    if(i==0){
+      mu[0] = 0.9;    // High mass WD
+      sd[0] = 0.4;
+      w[0] = 0.25;
+    }
 
-  mu[0] = 0.2;    // ELM WD
-  mu[1] = 0.6;    // Standard WD
-  mu[2] = 0.9;    // High mass WD
-  mu[3] = 1.4;    // NS
- 
-  sd[0] = 0.4;
-  sd[1] = 0.4;
-  sd[2] = 0.4;
-  sd[3] = 0.4;
+    if(i==1){
+      mu[1] = 0.6;    // Standard WD
+      sd[1] = 0.4;
+      w[1] = 0.25;
+    }
 
-  w[0] = 0.25;
-  w[1] = 0.25;
-  w[2] = 0.25;
-  w[3] = 0.25;
+    if(i==2){
+      mu[2] = 0.2;    // ELM WD
+      sd[2] = 0.4;
+      w[2] = 0.25;
+    }
+
+    if(i==3){
+      mu[3] = 1.4;    // NS
+      sd[3] = 0.4;
+      w[3] = 0.25;
+    }
   
+  }
+
   
   for(i=0;i<M2.size();i++){
 
@@ -156,7 +162,7 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
 
 
 
-void mod_mix_gaus_gibbs(double mu[4],double sd[4],double w[4],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,int print_flag,int l,ofstream* OUT,long* seed){
+void mod_mix_gaus_gibbs(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,int print_flag,int l,ofstream* OUT,long* seed){
   int i,j,k;
   int n_objs,nsteps;
 
@@ -187,11 +193,7 @@ void mod_mix_gaus_gibbs(double mu[4],double sd[4],double w[4],vector<double>& in
   
   if(print_flag){
     *OUT << setprecision(4) << l << " ";
-    *OUT << mu[0] << " " << sd[0] << " " << w[0] << " ";
-    *OUT << mu[1] << " " << sd[1] << " " << w[1] << " ";
-    *OUT << mu[2] << " " << sd[2] << " " << w[2] << " ";
-    *OUT << mu[3] << " " << sd[3] << " " << w[3] << " ";
-    
+    for(i=0;i<N_GAUSS;i++)  *OUT << mu[i] << " " << sd[i] << " " << w[i] << " ";    
     *OUT << endl;
   }
 
@@ -201,7 +203,7 @@ void mod_mix_gaus_gibbs(double mu[4],double sd[4],double w[4],vector<double>& in
 
 
 
-double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1,double M2_min,double K,double Porb,long* seed){
+double prob_M2_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],string Name,double M1,double M2_min,double K,double Porb,long* seed){
   //  P( M2[j] | mu, sd, w, M2_min[j] )
 
   int i,j;
@@ -213,19 +215,22 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
   double M2_prob;
   
 
+  model[0] = M1;
+  model[1] = K;
+  model[2] = Porb;
+  model[3] = 1.0;   // This is where "A" goes
+  model[4] = M2_min;
+  model[5] = 0.0;
 
-  // Copy variables to array for rkdumb
-  for(i=0;i<4;i++){
-    model[3*i] = mu[i];
-    model[3*i+1] = sd[i];
-    model[3*i+2] = w[i];
+  if(M2_MODEL==1){
+    // Copy variables to array for rkdumb
+    for(i=0;i<N_GAUSS;i++){
+      model[3*i+6] = mu[i];
+      model[3*i+7] = sd[i];
+      model[3*i+8] = w[i];
+    }
   }
-  model[12] = M1;
-  model[13] = K;
-  model[14] = Porb;
-  model[15] = 1.0;   // This is where "A" goes
-  model[16] = M2_min;
-  model[17] = 0.0;
+
 
   if(Name == "J0106-1000") return 0.43;
   if(Name == "J0651+2844") return 0.50;
@@ -244,14 +249,14 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
   
   // Normalize to 1
   A = 1.0/M2_prob;
-  model[15] = A;
+  model[3] = A;
 
     
     
     
 // Second, draw random number, then integrate to that point
 
-  model[17] = ran3(seed);
+  model[5] = ran3(seed);
 
   // Integrate over range [M2_min,M2], until we reach the target integrated area
   // From Maria's suggestion, use a root finder on a function that calls the integrator
@@ -268,22 +273,27 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
 
 }
 
+
+/*
 void mix_gauss_mass(double M2, double* f, double* df, double* model){
   int i;
 
-  double mu[4];
-  double sd[4];
-  double w[4];
+  double mu[N_GAUSS];
+  double sd[N_GAUSS];
+  double w[N_GAUSS];
   double area;
   double M2_min;
 
 
-  for(i=0;i<4;i++){
-    mu[i] = model[3*i];
-    sd[i] = model[3*i+1];
-    w[i] = model[3*i+2];
+  area = model[0];
+
+  if(M2_MODEL == 1){
+    for(i=0;i<N_GAUSS;i++){
+      mu[i] = model[3*i+1];
+      sd[i] = model[3*i+2];
+      w[i] = model[3*i+3];
+    }
   }
-  area = model[12];
 
 
   *f = -2.0*area;
@@ -294,40 +304,38 @@ void mix_gauss_mass(double M2, double* f, double* df, double* model){
   for(i=0;i<4;i++) *df += w[i] * 2.0/sqrt(PI) * exp( -(M2-mu[i])*(M2-mu[i])/(2.0*sd[i]*sd[i]) );
 
 }
+*/
 
 
-int prob_C_model(double M2,double mu[4],double sd[4],double w[4],long* seed){
+int prob_C_model(double M2,double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],long* seed){
   // Don't have to worry about sin(i) here - Affects all models at same M2 the same
 
   int i;
 
-  double prob_temp[4];
+  double temp;
+  double prob_temp[N_GAUSS];
   double prob_tot;
   double prob_ran;
   
   prob_tot = 0.0;
-  for(i=0;i<4;i++){
+  for(i=0;i<N_GAUSS;i++){
     prob_temp[i] = gauss_prob(mu[i],w[i],sd[i],M2);
     prob_tot += prob_temp[i];
   }
-  for(i=0;i<4;i++) prob_temp[i] = prob_temp[i]/prob_tot;
+  for(i=0;i<N_GAUSS;i++) prob_temp[i] = prob_temp[i]/prob_tot;
 
   prob_ran = ran3(seed);
-  
-  if(prob_ran < prob_temp[0]){
-    return 0;
-  }else if(prob_ran < prob_temp[0]+prob_temp[1]){
-    return 1;
-  }else if(prob_ran < prob_temp[0]+prob_temp[1]+prob_temp[2]){
-    return 2;
-  }else {
-  	return 3;
+
+  temp = 0.0;
+  for(i=0;i<N_GAUSS;i++){
+    temp += prob_temp[i];
+    if(prob_ran < temp) return i;
   }
   
 }
 
 
-void prob_mix_gauss(double mu[4],double sd[4],double w[4],vector<double>& M2,vector<int>& C){  
+void prob_mix_gauss(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& M2,vector<int>& C){  
   // To determine P( mu, sigma, w | M2, C )
 
   int i,j;
@@ -337,7 +345,7 @@ void prob_mix_gauss(double mu[4],double sd[4],double w[4],vector<double>& M2,vec
 
   n_objs = M2.size();
 
-  for(i=0;i<4;i++){
+  for(i=0;i<N_GAUSS;i++){
 
     n_C = 0;
     mean = 0.0;
@@ -359,11 +367,12 @@ void prob_mix_gauss(double mu[4],double sd[4],double w[4],vector<double>& M2,vec
       // Weights are the number of data points in each Gaussian
       w[i] = (double)n_C / (double) n_objs;
 
-/*
-FOR NOW, DON'T LET AVERAGES WANDER
-      // Means are unweighted averages
-      mu[i] = mean / (double) n_C;
-*/
+
+      // Means are unweighted averages.
+      // Can keep gaussians from moving in model
+      // Change MODEL_FIX_GAUSS in M_2.h
+      if(!MODEL_FIX_GAUSS) mu[i] = mean / (double) n_C;
+
 
       // Standard deviations are the calculated standard deviations
       sd[i] = 0.0;
@@ -400,25 +409,27 @@ void find_M2(double M2, double* f, double* df, double* model){
 double eval_M2(double M2, double* model){
   int i;
   
-  double mu[4];
-  double sd[4];
-  double w[4];
+  double mu[N_GAUSS];
+  double sd[N_GAUSS];
+  double w[N_GAUSS];
   double M1,K,Porb,A;
   double sini;
   double temp;
 
-  for(i=0;i<4;i++){
-    mu[i] = model[3*i];
-    sd[i] = model[3*i+1];
-    w[i] = model[3*i+2];
+
+  M1 = model[0];     // Observed WD mass
+  K = model[1];      // Line of sight orbital velocity
+  Porb = model[2];   // Orbital period
+  A = model[3];      // Normalization constant
+
+  for(i=0;i<N_GAUSS;i++){
+    mu[i] = model[3*i+6];
+    sd[i] = model[3*i+7];
+    w[i] = model[3*i+8];
   }
-  M1 = model[12];     // Observed WD mass
-  K = model[13];      // Line of sight orbital velocity
-  Porb = model[14];   // Orbital period
-  A = model[15];      // Normalization constant
 
   temp = 0.0;
-  for(i=0;i<4;i++){  
+  for(i=0;i<N_GAUSS;i++){  
 
     sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
 
@@ -432,24 +443,26 @@ double eval_M2(double M2, double* model){
 void integrate_M2(double M2, double* f, double* df, double* model){
   int i;
   
-  double mu[4];
-  double sd[4];
-  double w[4];
+  double mu[N_GAUSS];
+  double sd[N_GAUSS];
+  double w[N_GAUSS];
   
   double M1,K,Porb,A,M2_min;
   double area;
 
-  for(i=0;i<4;i++){
-    mu[i] = model[3*i];
-    sd[i] = model[3*i+1];
-    w[i] = model[3*i+2];
+
+  M1 = model[0];     // Observed WD mass
+  K = model[1];      // Line of sight orbital velocity
+  Porb = model[2];   // Orbital period
+  A = model[3];      // Normalization constant
+  M2_min = model[4]; // Minimum M2
+  area = model[5];   // Value to integrate to
+
+  for(i=0;i<N_GAUSS;i++){
+    mu[i] = model[3*i+6];
+    sd[i] = model[3*i+7];
+    w[i] = model[3*i+8];
   }
-  M1 = model[12];     // Observed WD mass
-  K = model[13];      // Line of sight orbital velocity
-  Porb = model[14];   // Orbital period
-  A = model[15];      // Normalization constant
-  M2_min = model[16]; // Minimum M2
-  area = model[17];   // Value to integrate to
 
 
   // Integrate [M2_min,M2] to get area, update (*f)
@@ -481,14 +494,20 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
   
   vector<string> data;
   
+
+
+
   // Open data file
   IN.open("ELM_WD.dat");
+  //  IN.open("dist_1_gauss.dat");
+
 
   // Read in data, add M2,min to vector M2
   while(getline(IN,line)){
 
     split(line,data);
 
+    
     Name_temp = data[0];
     P_temp = strtof(data[1]);
     P_err_temp = strtof(data[2]);
@@ -507,6 +526,15 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
       M1.push_back(M1_temp);
       M1_err.push_back(M1_err_temp);
     }
+    
+
+    /*
+    Names.push_back(data[3]);
+    Porb.push_back(strtof(data[1]));
+    M1.push_back(strtof(data[0]));
+    K.push_back(strtof(data[2]));
+    */
+
   }
   
   IN.close();

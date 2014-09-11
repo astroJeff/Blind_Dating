@@ -5,10 +5,10 @@ using namespace std;
 
 #define N_CALC 100
 #define BURN_IN 100
-// #define M_DELTA 0.0002
-// #define C_DELTA 0.0005
-// #define SD_DELTA 0.0005
-// #define SD_M2 0.00005
+
+#define M2_MODEL 1 /* 1-Gaussians  */
+#define MODEL_FIX_GAUSS 0   /* 0-Allow Gaussians to move 1-Fix Gaussians  */
+#define N_GAUSS 1
 
 
 #define MSEED 161803397
