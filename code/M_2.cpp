@@ -76,8 +76,6 @@ int main(int argc, char* argv[]){
 
 
 
-
-
     print_flag = 1;  // Print out for iterations
 
     // Iterate for N_CALC times
@@ -209,11 +207,10 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
   int i,j;
   int nsteps;
   
-  double M2, deltaM;
+  double M2;
   double A;
-  double model[16];
+  double model[18];
   double M2_prob;
-  double ran_val;
   
 
 
@@ -227,7 +224,8 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
   model[13] = K;
   model[14] = Porb;
   model[15] = 1.0;   // This is where "A" goes
-
+  model[16] = M2_min;
+  model[17] = 0.0;
 
   if(Name == "J0106-1000") return 0.43;
   if(Name == "J0651+2844") return 0.50;
@@ -249,67 +247,24 @@ double prob_M2_model(double mu[4],double sd[4],double w[4],string Name,double M1
   model[15] = A;
 
     
+    
+    
 // Second, draw random number, then integrate to that point
 
-  ran_val = ran3(seed);
+  model[17] = ran3(seed);
 
   // Integrate over range [M2_min,M2], until we reach the target integrated area
-  // Use bifurcation method here - There must be a better way!!
+  // From Maria's suggestion, use a root finder on a function that calls the integrator
+  // Thanks for the idea, Maria!
   
-  M2_prob = 0.0;
-  deltaM = (5.0-M2_min)/4.0;
-  M2 = (5.0-M2_min)/2.0 + M2_min;
-    
-  for(i=0;i>-1;i++){
 
-    qromb(eval_M2,M2_min,M2,1.0e-8,&M2_prob,model);
-
-    if(M2_prob > ran_val){
-      M2 -= deltaM;
-    }else {
-      M2 += deltaM;
-    }
-
-    deltaM /= 2.0;
-    
-    if (deltaM < 1.0e-6)  break;
-  }
+  M2 = rtsafe(integrate_M2,M2_min,5.0,1.0e-8,model);
+  
+  
 
 
   return M2;
 
-/*
-  int i;
-
-  double ran_area[4];
-  double temp_c;
-  double area_tot;
-
-  
-  area_tot = 0.0;
-  for(i=0;i<4;i++) ran_area[i] = rkdumb(  );
-  for(i=0;i<4;i++) area_tot += ran_area[i];
-
-
-
-  area_tot = 0.0;
-  for(i=0;i<4;i++){
-    ran_area[i] = 0.5 * w[i] * ( 1 + erf( (M2_min[j]-mu[i])/(sqrt(2.0)*sd[i]) ) );
-    area_tot += ran_area[i];
-  }
-  
-  // Need a root finder to find M2
-  for(i=0;i<4;i++){
-    model[3*i] = mu[i];
-    model[3*i+1] = sd[i];
-    model[3*i+2] = w[i];
-  }
-  
-  // If Gaussians are proper normalized, this should work
-  model[12] = (1.0-area_tot) + area_tot * ran3(seed);
-
-  return rtsafe(mix_gaus_mass,M2_min[j],1.0e7,1.0e-5,model);
-*/
 
 }
 
@@ -404,8 +359,11 @@ void prob_mix_gauss(double mu[4],double sd[4],double w[4],vector<double>& M2,vec
       // Weights are the number of data points in each Gaussian
       w[i] = (double)n_C / (double) n_objs;
 
+/*
+FOR NOW, DON'T LET AVERAGES WANDER
       // Means are unweighted averages
       mu[i] = mean / (double) n_C;
+*/
 
       // Standard deviations are the calculated standard deviations
       sd[i] = 0.0;
@@ -471,16 +429,15 @@ double eval_M2(double M2, double* model){
   return temp;
 }
 
-void integrate_M2(double M2, double* var, double* derivs, double* model){
+void integrate_M2(double M2, double* f, double* df, double* model){
   int i;
   
   double mu[4];
   double sd[4];
   double w[4];
+  
+  double M1,K,Porb,A,M2_min;
   double area;
-  double M1,K,Porb,A;
-  double sini,sini_deriv;
-  double temp;
 
   for(i=0;i<4;i++){
     mu[i] = model[3*i];
@@ -491,23 +448,22 @@ void integrate_M2(double M2, double* var, double* derivs, double* model){
   K = model[13];      // Line of sight orbital velocity
   Porb = model[14];   // Orbital period
   A = model[15];      // Normalization constant
+  M2_min = model[16]; // Minimum M2
+  area = model[17];   // Value to integrate to
 
 
-  derivs[0] = 0.0;  
-
-  for(i=0;i<4;i++){  
-
-    sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
-//    sini_deriv = K * (-M1-1.0/3.0*M2) / (pow(M1+M2,1.0/3.0) * M2*M2);
-
-//    derivs[0] += A * gauss_prob(mu[i],w[i],sd[i],M2) * (-(M2-mu[i])/sd[i]/sd[i]) * sini;
-//    derivs[0] += A * gauss_prob(mu[i],w[i],sd[i],M2) * pow(Porb/(2.0*PI*GGG),1.0/3.0) * sini_deriv;
-    temp = -(M2-mu[i])/sd[i]/sd[i] - 1.0/M2 + 2.0/3.0 * 1.0/(M1+M2);
-
-    derivs[0] += A * gauss_prob(mu[i],w[i],sd[i],M2) * sini * temp;
-    
-
+  // Integrate [M2_min,M2] to get area, update (*f)
+  if(abs(M2-M2_min) < 1.0e-10){
+    *f = 0.0;
+  } else {
+    qromb(eval_M2,M2_min,M2,1.0e-8,f,model);
   }
+  
+  // Subtract area we are trying to get to
+  *f = (*f) - area;
+  
+  // Derivative of integral is just the function
+  *df = eval_M2(*f,model);
 
 }
 
