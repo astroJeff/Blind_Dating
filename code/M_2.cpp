@@ -79,6 +79,9 @@ int main(int argc, char* argv[]){
     // Iterate for N_CALC times
     for(i=0;i<N_CALC;i++){
 
+      cout << M2[0] << " " << inc[0] << endl;
+      //      if(i%1000 == 0) cout << i << " iterations complete of " << N_CALC << endl;
+
       // MCMC algorithm in here    
       mod_mix_gaus_gibbs(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
     
@@ -178,6 +181,9 @@ void mod_mix_gaus_gibbs(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],
     //  P( M2[j] | mu, sd, w )
     M2[j] = prob_M2_model(mu,sd,w,Names[j],M1[j],M2_min[j],K[j],Porb[j],seed);
 
+    // Update inclination angle. This isn't used, just to keep track of
+    inc[j] = asin( pow(Porb[j]/(2.0*PI*GGG) * (M1[j]+M2[j])*(M1[j]+M2[j]),1.0/3.0) * K[j] / M2[j] );
+    inc[j] = inc[j]*180.0/PI;
 
     //  P( C[j] | M2[j], mu, sd, w )  
     C[j] = prob_C_model(M2[j],mu,sd,w,seed);
@@ -213,7 +219,7 @@ double prob_M2_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],str
   double A;
   double model[18];
   double M2_prob;
-  
+
 
   model[0] = M1;
   model[1] = K;
@@ -368,6 +374,8 @@ void prob_mix_gauss(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vect
       w[i] = (double)n_C / (double) n_objs;
 
 
+      // SHOULD I BE USING STUDENT'S t-test HERE???
+
       // Means are unweighted averages.
       // Can keep gaussians from moving in model
       // Change MODEL_FIX_GAUSS in M_2.h
@@ -498,16 +506,16 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
 
 
   // Open data file
-  IN.open("ELM_WD.dat");
-  //  IN.open("dist_1_gauss.dat");
-
+  //  IN.open("ELM_WD.dat");
+  IN.open("dist_1_gauss.dat");
+  getline(IN,line);
 
   // Read in data, add M2,min to vector M2
   while(getline(IN,line)){
 
     split(line,data);
 
-    
+    /*
     Name_temp = data[0];
     P_temp = strtof(data[1]);
     P_err_temp = strtof(data[2]);
@@ -526,14 +534,14 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
       M1.push_back(M1_temp);
       M1_err.push_back(M1_err_temp);
     }
-    
+    */
 
-    /*
+    
     Names.push_back(data[3]);
     Porb.push_back(strtof(data[1]));
     M1.push_back(strtof(data[0]));
     K.push_back(strtof(data[2]));
-    */
+    
 
   }
   

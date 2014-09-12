@@ -88,11 +88,6 @@ void qromb(double (*func)(double, double *), double x1, double x2, double eps, d
   }
 
   cerr << "Too many steps in qromb" << endl;
-  cerr << x1 << " " << x2 << " " << *y << " " << y_err << endl;
-  cerr << model[0] << " " << model[1] << " " << model[2] << endl;
-  cerr << model[3] << " " << model[4] << " " << model[5] << endl;
-  cerr << model[6] << " " << model[7] << " " << model[8] << endl;
-  cerr << model[9] << " " << model[10] << " " << model[11] << endl;
 
 }
 

@@ -3,8 +3,8 @@
 
 using namespace std;
 
-#define N_CALC 100
-#define BURN_IN 100
+#define N_CALC 10000
+#define BURN_IN 50
 
 #define M2_MODEL 1 /* 1-Gaussians  */
 #define MODEL_FIX_GAUSS 0   /* 0-Allow Gaussians to move 1-Fix Gaussians  */
