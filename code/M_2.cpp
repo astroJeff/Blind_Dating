@@ -14,14 +14,19 @@ using namespace std;
 int main(int argc, char* argv[]){
 
   int j,k;
-  int print_flag,n_objs;
+  int n_objs;
 
   long i,seed;
 
+  double P1,P2;
+  double frac_NS,frac_NS_new;
 
   double mu[N_GAUSS];
   double sd[N_GAUSS];
   double w[N_GAUSS];
+  double mu_new[N_GAUSS];
+  double sd_new[N_GAUSS];
+  double w_new[N_GAUSS];
 
   ofstream OUT;
   
@@ -59,42 +64,43 @@ int main(int argc, char* argv[]){
   // Give initial values
   initial_guess(mu,sd,w,inc,M2,M2_min,Names,M1,Porb,K,&seed);
 
-
+  OUT << "mu_1 sd_1 w_1 mu_2 sd_2 w_2 w_NS" << endl;
 
   // k number of walkers
   for(k=0;k<1;k++){
 
 
+    // Metropolis-Hastings MCMC algorithm in here    
+    // Burn in period
 
-    // Iterate for BURN_IN times for "burn in"
-    print_flag = 0;  // Don't print out for "burn in"
-    
- //   for(i=0;i<BURN_IN;i++) iterate(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
-
-
-    print_flag = 1;  // Print out for iterations
-
-
-    // Iterate for N_CALC times
-    mu[0] = 0.60;
-    for(i=0;i<10;i++){
-      mu[0] += 0.02;
-
-        
-      sd[0] = 0.10;
-      for(j=0;j<10;j++){
-//    for(i=0;i<N_CALC;i++){
-        sd[0] += 0.02;
-    
-    
-      // MCMC algorithm in here    
-//      mod_mix_gaus_gibbs(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
-        iterate(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
-      }
-    
+    i=0;
+    while(i<BURN_IN){
+      P1 = P_model(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+            
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
+      i ++;
     }
-  }
+    
+    
+    // Iterate for N_CALC times
 
+    i = 0;
+    while(i<N_CALC){
+      P1 = P_model(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
+      i ++;
+      
+      for(j=0;j<N_GAUSS;j++) OUT << mu[j] << " " << sd[j] << " " << w[j] << " ";
+      OUT << endl;
+    }
+
+ 
+  }
 
 
   OUT.close();
@@ -102,7 +108,7 @@ int main(int argc, char* argv[]){
 }
 
 
-void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
+void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
   int i;
   
   double Mf;
@@ -111,28 +117,29 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
   for(i=0;i<N_GAUSS;i++){
     if(i==0){
       mu[0] = 0.9;    // High mass WD
-      sd[0] = 0.4;
-//      w[0] = 0.25;
-      w[0] = 1.0;
+      sd[0] = 0.2;
+      w[0] = 0.46;
     }
 
     if(i==1){
       mu[1] = 0.6;    // Standard WD
-      sd[1] = 0.4;
-      w[1] = 0.25;
+      sd[1] = 0.2;
+      w[1] = 0.46;
     }
+
 
     if(i==2){
-      mu[2] = 0.2;    // ELM WD
-      sd[2] = 0.4;
-      w[2] = 0.25;
+      mu[2] = NS_MASS;    // NS
+      sd[2] = 0.05;
+      w[2] = 0.08;
     }
 
-    if(i==3){
-      mu[3] = 1.4;    // NS
-      sd[3] = 0.4;
-      w[3] = 0.25;
-    }
+
+//    if(i==2){
+//      mu[2] = 0.2;    // ELM WD
+//      sd[2] = 0.4;
+//      w[2] = 0.25;
+//    }
   
   }
 
@@ -163,20 +170,70 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
 }
 
 
+void next_point(double mu[N_GAUSS], double sd[N_GAUSS], double w[N_GAUSS], double* frac_NS, double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,long* seed){
+  int i;
+  double w_tot;
+  
+  for(i=0;i<N_GAUSS;i++){
+    mu_new[i] = gauss_ran(mu[i],MOVE_MU,seed);
+    sd_new[i] = gauss_ran(sd[i],MOVE_SD,seed);
+    w_new[i] = gauss_ran(w[i],MOVE_W,seed);
+    while(w_new[i] < 0.0)  w_new[i] = gauss_ran(w[i],MOVE_W,seed);
+  }
+  
+  *frac_NS_new = gauss_ran(*frac_NS,MOVE_NS_FRAC,seed);
+  while(*frac_NS_new < 0.0) *frac_NS_new = gauss_ran(*frac_NS,MOVE_NS_FRAC,seed);
+  
+  // Neutron star element
+//  mu_new[2] = NS_MASS;
+//  sd_new[2] = 0.05;
 
-void iterate(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,int print_flag,int l,ofstream* OUT,long* seed){
+  w_tot = 0.0;
+  for(i=0;i<N_GAUSS;i++) w_tot += w_new[i];
+  if(ADD_NS) w_tot += *frac_NS_new;
+  
+  for(i=0;i<N_GAUSS;i++) w_new[i] /= w_tot;  
+  if(ADD_NS) *frac_NS_new /= w_tot;
+
+}
+
+
+void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new){
+  int i;
+
+  for(i=0;i<N_GAUSS;i++){
+    mu[i] = mu_new[i];
+    sd[i] = sd_new[i];
+    w[i] = w_new[i];
+  }
+  
+  (*frac_NS) = (*frac_NS_new);
+
+}
+
+
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
   int i,j,k;
   int n_objs;
   
-  double P1,P2;
+  double frac_NS;
+  double P1,P2,P_NS;
   double prob;
   double likelihood;
-  double model[9];
+  double model[6+3*N_GAUSS];
+  double NS_model[2];
   
   n_objs = K.size();
 
 
   likelihood = 0.0;
+  
+  for(i=0;i<N_GAUSS;i++){
+    model[3*i+6] = mu[i];
+    model[3*i+7] = sd[i];
+    model[3*i+8] = w[i];
+  }
+
 
   for(j=0;j<n_objs;j++){
     model[0] = M1[j];
@@ -186,43 +243,37 @@ void iterate(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<doub
     model[4] = M2_min[j];
     model[5] = 0.0;
 
+    if(ADD_NS){
+      NS_model[0] = frac_NS;
+      NS_model[1] = M1[j];
+    }
 
-    for(i=0;i<N_GAUSS;i++){
-  
-      model[6] = mu[i];
-      model[7] = sd[i];
-      model[8] = w[i];
-    
-      // We want P(M2_min|mu,sd)
-      P1 = prob_M2_model(model);
-    
-    
-      // Need to integrate over all M2_min
-      qromb(prob_M2_wrapper,0.001,1.5,1.0e-4,&P2,model);
+    // We want P(M2_min|mu,sd)
+    P1 = prob_M2_model(model);
         
-      likelihood += log10(P1/P2);
-
-    }    
+    // Need to integrate over all M2_min
+    qromb(prob_M2_wrapper,0.001,2.0,1.0e-4,&P2,model);
+    
+    // STILL TESTING NS COMPONENT
+    frac_NS = 0.0;
+    if (ADD_NS){
+      P1 += prob_NS(frac_NS,M1[j],M2_min[j]); 
+      P2 += prob_NS_all(frac_NS,M1[j]);  
+    }
+        
+    likelihood += log10(P1/P2);
 
   }
 
+  cout << P1 << " " << P2 << " " << likelihood << endl;
 
-  cout << mu[0] << " " << sd[0] << " " << likelihood << endl;
-
-}
-
-
-
-double prob_M2_wrapper(double M2_min, double* model){
-  
-  model[4] = M2_min;  
-
-  return prob_M2_model(model);
+  return likelihood;
 
 }
 
 
-double prob_M2_model(double model[9]){
+
+double prob_M2_model(double model[6+3*N_GAUSS]){
   //  P( M2[j] | mu, sd, w, M2_min[j] )
 
   int i,j;
@@ -260,6 +311,44 @@ double prob_M2_model(double model[9]){
   
   return M2_prob;
 
+}
+
+
+double prob_M2_wrapper(double M2_min, double* model){
+  
+  model[4] = M2_min;  
+
+  return prob_M2_model(model);
+
+}
+
+
+
+double prob_NS(double frac_NS, double M1, double M2_min){
+  // P(NS) = sin(i)
+  double M2 = NS_MASS;
+ 
+  return frac_NS * pow((M1+M2)/(M1+M2_min), 2.0/3.0) * M2_min / M2;
+}
+
+double prob_NS_all(double frac_NS, double M1){
+  // This is (should be) the analytic integral over all M2_min's for a given M1
+
+  double xmin,xmax;
+  double M2;
+  double a1,a2,a3,a4;
+
+  xmin = 0.0;
+  xmax = NS_MASS;  
+  M2 = NS_MASS;
+
+  a1 = 3.0 * xmax / M2 * pow((M1+M2)*(M1+M2)*(M1+xmax),1.0/3.0);
+  a2 = -3.0 * xmin / M2 * pow((M1+M2)*(M1+M2)*(M1+xmin),1.0/3.0);
+
+  a3 = -9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmax,4.0/3.0);
+  a4 = 9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmin,4.0/3.0);
+  
+  return a1+a2+a3+a4;
 }
 
 
@@ -370,6 +459,7 @@ double eval_M2(double M2, double* model){
   double M1,K,Porb,A,M2_min;
   double sini;
   double temp;
+  double frac_NS;
 
 
   M1 = model[0];     // Observed WD mass
@@ -388,10 +478,13 @@ double eval_M2(double M2, double* model){
   temp = 0.0;
   for(i=0;i<N_GAUSS;i++){  
 
+
 //    sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
     sini = pow((M1+M2)/(M1+M2_min) , 2.0/3.0) * M2_min/M2;
 
     temp += A * gauss_prob(mu[i],w[i],sd[i],M2) * sini;
+
+//    cout << i << " " << sini << " " << mu[i] << " " << sd[i] << " " << w[i] << " " << temp << endl;
 
   }
 
