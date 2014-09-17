@@ -13,7 +13,7 @@ using namespace std;
 
 int main(int argc, char* argv[]){
 
-  int k;
+  int j,k;
   int print_flag,n_objs;
 
   long i,seed;
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]){
   vector<double> K_err;
   vector<double> Porb;
   vector<double> Porb_err;
-  
+  vector<double> M2_min;
   
 
 
@@ -44,14 +44,13 @@ int main(int argc, char* argv[]){
 
 
   // Take in data
-  read_data(Names,M1,M1_err,K,K_err,Porb,Porb_err);
+  read_data(Names,M1,M1_err,M2_min,K,K_err,Porb,Porb_err);
 
   
   // Declare and initialize model variables
   n_objs = M1.size();
 
 
-  vector<double> M2_min(n_objs,0.0);
   vector<double> M2(n_objs,0.0);
   vector<double> inc(n_objs,0.0);
   vector<int> C(n_objs,0);
@@ -70,29 +69,32 @@ int main(int argc, char* argv[]){
     // Iterate for BURN_IN times for "burn in"
     print_flag = 0;  // Don't print out for "burn in"
     
-    for(i=0;i<BURN_IN;i++) mod_mix_gaus_gibbs(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
-
+ //   for(i=0;i<BURN_IN;i++) iterate(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
 
 
     print_flag = 1;  // Print out for iterations
 
+
     // Iterate for N_CALC times
-    for(i=0;i<N_CALC;i++){
+    mu[0] = 0.60;
+    for(i=0;i<10;i++){
+      mu[0] += 0.02;
 
-      cout << M2[0] << " " << inc[0] << endl;
-      //      if(i%1000 == 0) cout << i << " iterations complete of " << N_CALC << endl;
-
+        
+      sd[0] = 0.10;
+      for(j=0;j<10;j++){
+//    for(i=0;i<N_CALC;i++){
+        sd[0] += 0.02;
+    
+    
       // MCMC algorithm in here    
-      mod_mix_gaus_gibbs(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
+//      mod_mix_gaus_gibbs(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
+        iterate(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,print_flag,k,&OUT,&seed);
+      }
     
     }
   }
 
-
-  // Print results
-//  print_results(best_M,best_C,best_sd);
-
-  
 
 
   OUT.close();
@@ -110,7 +112,8 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
     if(i==0){
       mu[0] = 0.9;    // High mass WD
       sd[0] = 0.4;
-      w[0] = 0.25;
+//      w[0] = 0.25;
+      w[0] = 1.0;
     }
 
     if(i==1){
@@ -133,7 +136,7 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
   
   }
 
-  
+/*  
   for(i=0;i<M2.size();i++){
 
     inc[i] = get_inc(seed);
@@ -143,7 +146,9 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
     model[0] = M1[i];
     model[1] = Mf;
     model[2] = PI/2.0;
-    M2_min[i] = rtsafe(find_M2,0.0,10.0,1.0e-5,model);
+    M2_min[i] = rtsafe(find_M2,0.1,10.0,1.0e-5,model);
+
+    cout << i << " " << K[i] << " " << M2_min[i] << endl;
 
     model[2] = inc[i];
     M2[i] = rtsafe(find_M2,M2_min[i],10.0,1.0e-5,model);
@@ -153,74 +158,81 @@ void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<do
     if(Names[i] == "NLTT11748") M2[i] = 0.76;    
 
   }
-
+*/
   
 }
 
 
 
-
-
-
-
-
-
-void mod_mix_gaus_gibbs(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,int print_flag,int l,ofstream* OUT,long* seed){
+void iterate(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,int print_flag,int l,ofstream* OUT,long* seed){
   int i,j,k;
-  int n_objs,nsteps;
-
-
-  // Number of objects
+  int n_objs;
+  
+  double P1,P2;
+  double prob;
+  double likelihood;
+  double model[9];
+  
   n_objs = K.size();
-  
 
-  // First, find P( M2, C | mu, sd, w )
+
+  likelihood = 0.0;
+
   for(j=0;j<n_objs;j++){
+    model[0] = M1[j];
+    model[1] = K[j];
+    model[2] = Porb[j];
+    model[3] = 1.0;   // This is where "A" goes
+    model[4] = M2_min[j];
+    model[5] = 0.0;
 
 
-    //  P( M2[j] | mu, sd, w )
-    M2[j] = prob_M2_model(mu,sd,w,Names[j],M1[j],M2_min[j],K[j],Porb[j],seed);
-
-    // Update inclination angle. This isn't used, just to keep track of
-    inc[j] = asin( pow(Porb[j]/(2.0*PI*GGG) * (M1[j]+M2[j])*(M1[j]+M2[j]),1.0/3.0) * K[j] / M2[j] );
-    inc[j] = inc[j]*180.0/PI;
-
-    //  P( C[j] | M2[j], mu, sd, w )  
-    C[j] = prob_C_model(M2[j],mu,sd,w,seed);
+    for(i=0;i<N_GAUSS;i++){
   
+      model[6] = mu[i];
+      model[7] = sd[i];
+      model[8] = w[i];
+    
+      // We want P(M2_min|mu,sd)
+      P1 = prob_M2_model(model);
+    
+    
+      // Need to integrate over all M2_min
+      qromb(prob_M2_wrapper,0.001,1.5,1.0e-4,&P2,model);
+        
+      likelihood += log10(P1/P2);
+
+    }    
+
   }
 
 
-
-// Second, find P( mu, sd, w | M2, C )
-  prob_mix_gauss(mu,sd,w,M2,C);  
-  
-  
-  
-  if(print_flag){
-    *OUT << setprecision(4) << l << " ";
-    for(i=0;i<N_GAUSS;i++)  *OUT << mu[i] << " " << sd[i] << " " << w[i] << " ";    
-    *OUT << endl;
-  }
+  cout << mu[0] << " " << sd[0] << " " << likelihood << endl;
 
 }
 
 
 
+double prob_M2_wrapper(double M2_min, double* model){
+  
+  model[4] = M2_min;  
+
+  return prob_M2_model(model);
+
+}
 
 
-double prob_M2_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],string Name,double M1,double M2_min,double K,double Porb,long* seed){
+double prob_M2_model(double model[9]){
   //  P( M2[j] | mu, sd, w, M2_min[j] )
 
   int i,j;
   int nsteps;
   
-  double M2;
-  double A;
-  double model[18];
+  double M1,M2,A,K,Porb,M2_min;
+  double mu,sd,w;
   double M2_prob;
 
-
+/*
   model[0] = M1;
   model[1] = K;
   model[2] = Porb;
@@ -228,89 +240,27 @@ double prob_M2_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],str
   model[4] = M2_min;
   model[5] = 0.0;
 
-  if(M2_MODEL==1){
-    // Copy variables to array for rkdumb
-    for(i=0;i<N_GAUSS;i++){
-      model[3*i+6] = mu[i];
-      model[3*i+7] = sd[i];
-      model[3*i+8] = w[i];
-    }
-  }
 
+  model[6] = mu;
+  model[7] = sd;
+  model[8] = w;
 
-  if(Name == "J0106-1000") return 0.43;
-  if(Name == "J0651+2844") return 0.50;
-  if(Name == "NLTT11748") return 0.76;
+*/
 
+//  if(Name == "J0106-1000") return 0.43;
+//  if(Name == "J0651+2844") return 0.50;
+//  if(Name == "NLTT11748") return 0.76;
 
-
-// First, normalize probability -> Find A
-
-  // Since non-zero probability at sin(i) = 1
+  // Normalize the function
   M2_prob = 0.0;
-//  for(i=0;i<4;i++) M2_prob += gauss_prob(mu[i],w[i],sd[i],M2_min);
+  M2_min = model[4];
   
   // Integrate over full range [M2_min,5.0] to get total probability
-  qromb(eval_M2,M2_min,5.0,1.0e-8,&M2_prob,model);
+  qromb(eval_M2,M2_min,3.0,1.0e-5,&M2_prob,model);
   
-  // Normalize to 1
-  A = 1.0/M2_prob;
-  model[3] = A;
-
-    
-    
-    
-// Second, draw random number, then integrate to that point
-
-  model[5] = ran3(seed);
-
-  // Integrate over range [M2_min,M2], until we reach the target integrated area
-  // From Maria's suggestion, use a root finder on a function that calls the integrator
-  // Thanks for the idea, Maria!
-  
-
-  M2 = rtsafe(integrate_M2,M2_min,5.0,1.0e-8,model);
-  
-  
-
-
-  return M2;
-
+  return M2_prob;
 
 }
-
-
-/*
-void mix_gauss_mass(double M2, double* f, double* df, double* model){
-  int i;
-
-  double mu[N_GAUSS];
-  double sd[N_GAUSS];
-  double w[N_GAUSS];
-  double area;
-  double M2_min;
-
-
-  area = model[0];
-
-  if(M2_MODEL == 1){
-    for(i=0;i<N_GAUSS;i++){
-      mu[i] = model[3*i+1];
-      sd[i] = model[3*i+2];
-      w[i] = model[3*i+3];
-    }
-  }
-
-
-  *f = -2.0*area;
-  for(i=0;i<4;i++) *f += w[i] + w[i]*erf( (M2-mu[i])/(sd[i]*sqrt(2.0)) );
-
-  
-  *df = 0.0;
-  for(i=0;i<4;i++) *df += w[i] * 2.0/sqrt(PI) * exp( -(M2-mu[i])*(M2-mu[i])/(2.0*sd[i]*sd[i]) );
-
-}
-*/
 
 
 int prob_C_model(double M2,double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],long* seed){
@@ -341,57 +291,54 @@ int prob_C_model(double M2,double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUS
 }
 
 
-void prob_mix_gauss(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& M2,vector<int>& C){  
+
+
+
+
+
+
+void prob_mix_gauss(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& M2,vector<int>& C,long* seed){  
   // To determine P( mu, sigma, w | M2, C )
 
   int i,j;
   int n_objs,n_C;
   
+  double w_tot;
   double mean;
-
+  
+  vector<double> obj_M2;  
+  
   n_objs = M2.size();
+  w_tot = 0.0;
+
 
   for(i=0;i<N_GAUSS;i++){
-
-    n_C = 0;
-    mean = 0.0;
-    for(j=0;j<n_objs;j++){
-
-      if(C[j] == i){
-        n_C ++;
-    
-        mean += M2[j];    
-    
-      }
-
-    }  
   
-    // If there are one or no data points in Gaussian keep same values as before
-    if( n_C < 2 ){
-      w[i] = 1.0/(double) n_objs;
-    } else {
-      // Weights are the number of data points in each Gaussian
-      w[i] = (double)n_C / (double) n_objs;
-
-
-      // SHOULD I BE USING STUDENT'S t-test HERE???
-
-      // Means are unweighted averages.
-      // Can keep gaussians from moving in model
-      // Change MODEL_FIX_GAUSS in M_2.h
-      if(!MODEL_FIX_GAUSS) mu[i] = mean / (double) n_C;
-
-
-      // Standard deviations are the calculated standard deviations
-      sd[i] = 0.0;
-      for(j=0;j<n_objs;j++){
-        if(C[j] == i) sd[i] += (mu[i] - M2[j]) * (mu[i] - M2[j]);
-      } 
-      sd[i] = sqrt( 1.0 / (double(n_C) - 1.0) ) * sqrt(sd[i]);
-
-    }    
   
+    // Create vector of values
+    obj_M2.clear();
+    for(j=0;j<n_objs;j++) if(C[j] == i) obj_M2.push_back(M2[j]);
+    
+    
+    
+    // Determine mean and standard deviation
+    find_gauss(&mu[i],&sd[i],obj_M2);
+    
+    
+    
+    // Determine weight - draw randomly from Poisson Distribution
+    w[i] = poisson_ran(obj_M2.size(),seed);
+
+    w_tot += w[i];
   }
+
+  // Normalize so weights all add to unity
+  for(i=0;i<N_GAUSS;i++) w[i] /= w_tot;
+    
+
+  cout << mu[0] << " " << sd[0] << " " << w[0] << endl;
+  
+
 
 
 }
@@ -420,7 +367,7 @@ double eval_M2(double M2, double* model){
   double mu[N_GAUSS];
   double sd[N_GAUSS];
   double w[N_GAUSS];
-  double M1,K,Porb,A;
+  double M1,K,Porb,A,M2_min;
   double sini;
   double temp;
 
@@ -429,6 +376,8 @@ double eval_M2(double M2, double* model){
   K = model[1];      // Line of sight orbital velocity
   Porb = model[2];   // Orbital period
   A = model[3];      // Normalization constant
+  M2_min = model[4];  
+
 
   for(i=0;i<N_GAUSS;i++){
     mu[i] = model[3*i+6];
@@ -439,7 +388,8 @@ double eval_M2(double M2, double* model){
   temp = 0.0;
   for(i=0;i<N_GAUSS;i++){  
 
-    sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
+//    sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
+    sini = pow((M1+M2)/(M1+M2_min) , 2.0/3.0) * M2_min/M2;
 
     temp += A * gauss_prob(mu[i],w[i],sd[i],M2) * sini;
 
@@ -491,12 +441,13 @@ void integrate_M2(double M2, double* f, double* df, double* model){
 
 
 
-void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,vector<double>& K,vector<double>& K_err,vector<double>& Porb,vector<double>& Porb_err){
+void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,vector<double>& M2_min,vector<double>& K,vector<double>& K_err,vector<double>& Porb,vector<double>& Porb_err){
   fstream IN;
   
   double M1_temp, M1_err_temp;
   double K_temp, K_err_temp;
   double P_temp, P_err_temp;
+  double M2_min_temp;
   
   string Name_temp,line;
   
@@ -541,6 +492,7 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
     Porb.push_back(strtof(data[1]));
     M1.push_back(strtof(data[0]));
     K.push_back(strtof(data[2]));
+    M2_min.push_back(strtof(data[4]));
     
 
   }
@@ -551,6 +503,31 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
 double get_inc(long *seed){
   return acos(1.0 - ran3(seed));
 }
+
+
+
+
+void find_gauss(double* mean,double* sd,vector<double> vals){
+  int i, n_objs;
+	
+  n_objs = vals.size();
+
+  *mean = 0.0;
+  for(i=0;i<n_objs;i++){
+    *mean += vals[i];
+  }
+  *mean = *mean/(double)vals.size();
+
+
+  *sd = 0.0;
+  for(i=0;i<n_objs;i++) *sd += (*mean - vals[i]) * (*mean - vals[i]);
+  
+  *sd = sqrt( 1.0 / (double(n_objs) - 1.0) ) * sqrt(*sd);
+
+}
+
+
+
 
 
 double strtof(string temp){
@@ -581,42 +558,6 @@ void split(string line, vector<string>& str_out){
   }
 }
 
-double ran3(long *idum){ 
-  static int inext, inextp;
-  static long ma[56];
-  static int iff=0;
-  long mj, mk;
-  int i, ii, k;
-  
-  if(*idum < 0 || iff == 0){
-    iff=1;
-    mj = abs(MSEED-abs(*idum));
-    mj = mj % (long)MBIG;
-    ma[55]=mj;
-    mk=1;
-    for(i=1;i<=54;i++){
-      ii = (21*i) % 55;
-      ma[ii] = mk;
-      mk = mj - mk;
-      if(mk < MZ) mk += (long)MBIG;
-      mj = ma[ii];
-    }
-    for(k=1;k<=4;k++)
-      for(i=1;i<=55;i++){
-        ma[i] -= ma[1+(i+30) % 55];
-        if(ma[i] < MZ) ma[i] += (long)MBIG;
-      }
-    inext=0;
-    inextp=31;
-    *idum=1;
-  }
-  if(++inext == 56) inext = 1;
-  if(++inextp == 56) inextp = 1;
-  mj=ma[inext]-ma[inextp];
-  if(mj < MZ) mj += (long)MBIG;
-  ma[inext]=mj;
-  return mj*FAC;
-}
 
 
 double gauss_ran(double val, double val_err, long* seed){
@@ -662,189 +603,44 @@ double gauss_prob(double val, double w, double val_err, double val_in){
 
 
 
-void sort(vector<double>& x){
-  // Heapsort algorithm
-
-  long e,i,j,k,l;
-
-  double tmp;
-
-  e = N_CALC-1;
-
-  // Build heap
-  i = (int)(e/2);
-  while(i>=0){
-    j = i;
-    while(j*2+1<=e){
-      k = j*2+1;
-      l = j;
-      if(x[l] < x[k]) l = k;
-      if(k+1 <= e && x[l] < x[k+1]) l = k+1;
-      if(l!=j){
-        tmp = x[j];
-        x[j] = x[l];
-        x[l] = tmp;
-        j = l;
-      } else break;
-    }
-    i--;
-  }
-
-  // Sort heap
-  while(e>0){
-    tmp = x[e];
-    x[e] = x[0];
-    x[0] = tmp;
-    e--;
-    
-    j = 0;
-    while(j*2+1<=e){
-      k = j*2+1;
-      l = j;
-      if(x[l] < x[k]) l = k;
-      if(k+1 <= e && x[l] < x[k+1]) l = k+1;
-      if(l != j){
-        tmp = x[j];
-        x[j] = x[l];
-        x[l] = tmp;
-        j = l;
-      }else break;
-    }
-  }
+double poisson_prob(double lambda, double n){
+  return pow(lambda,n)*exp(-lambda)/factorial(n);
 }
 
-
-double rtsafe(void (*funcd)(double,double *,double *,double *),double x1,double x2,double xacc,double* model){
-  int j;
-  double df,dx,dxold,f,fh,fl;
-  double temp,xh,xl,rts;
+double poisson_ran(double lambda,long* seed){
+  int k;
   
-  (*funcd)(x1,&fl,&df,model);
-  (*funcd)(x2,&fh,&df,model);
-  if ((fl > 0.0 && fh > 0.0) || (fl < 0.0 && fh < 0.0)){
-//    cerr << "Root must be bracketed in rtsafe" << endl;
-//    cerr << "M1 = " << M1 << " inc = " << inc << endl;
+  double ran_val,prob;
+  
+  k = 0;
+  prob = 0.0;
+  ran_val = ran3(seed);
+
+  while(prob < ran_val){
+    prob += exp(-lambda) * pow(lambda,k) / factorial(k);
+    k ++;
   }
-  if (fl == 0.0) return x1;
-  if (fh == 0.0) return x2;
-  if (fl < 0.0) {
-    xl=x1;
-    xh=x2;
-  } else {
-    xh=x1;
-    xl=x2;
-  }
-  rts=0.5*(x1+x2);
-  dxold=fabs(x2-x1);
-  dx=dxold;
-  (*funcd)(rts,&f,&df,model);
-  for (j=1;j<=MAXIT;j++) {
-    if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0)
-        || (fabs(2.0*f) > fabs(dxold*df))) {
-      dxold=dx;
-      dx=0.5*(xh-xl);
-      rts=xl+dx;
-      if (xl == rts) return rts;
-    } else {
-      dxold=dx;
-      dx=f/df;
-      temp=rts;
-      rts -= dx;
-      if (temp == rts) return rts;
-    }
-    if (fabs(dx) < xacc) return rts;
-    (*funcd)(rts,&f,&df,model);
-    if (f < 0.0)
-      xl=rts;
-    else
-      xh=rts;
-  }
-  cerr << "Maximum number of iterations exceeded in rtsafe" << endl;
-  return 0.0;
+  k --;
+
+  return k;
+}
+
+
+
+double factorial(double n){
+  return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
 }
 
 
 
 
-
-
-void rkdumb(double *vstart, int nvar, double x1, double x2, int nstep, double* x_cur,double* model,
-            void (*derivs)(double, double *, double *, double *))
-{
-  int i,k;
-  double x,h;
-  double *v,*vout,*dv;
-
-  v = new double[nvar];
-  vout = new double[nvar];
-  dv = new double[nvar];
-
-  for (i=0;i<nvar;i++){
-    v[i]=vstart[i];
-  }
-  x=x1;
-  h=(x2-x1)/nstep;
-
-  for (k=0;k<nstep;k++){
-    (*derivs)(x,v,dv,model);
-    
-//    cout << x << " " << v[0] << " " << dv[0] << " ";
-    
-    rk4(v,dv,nvar,x,h,vout,model,derivs);
-//    cout << v[0] << " " << dv[0] << endl;
-    
-    if((double)(x+h) == x) cerr << "Step size too small in routine rkdumb" << endl;
-    x += h;
-    (*x_cur) = x;
-    for (i=0;i<nvar;i++){
-      v[i]=vout[i];
-    }
-  }
-
-  if (k==nstep)  for (i=0;i<nvar;i++) vstart[i]=v[i];
-      
-  delete [] dv;
-  delete [] vout;
-  delete [] v;
-}
-
-
-void rk4(double *y, double *dydx, int n, double x, double h, double *yout, double* model,
-         void (*derivs)(double, double *, double *, double *))
-{
-  int i;
-  double xh,hh,h6,*dym,*dyt,*yt;
-
-  dym = new double[n];
-  dyt = new double[n];
-  yt = new double[n];
-
-  hh=h*0.5;
-  h6=h/6.0;
-  xh=x+hh;
-  for (i=0;i<n;i++) yt[i]=y[i]+hh*dydx[i];
-  (*derivs)(xh,yt,dyt,model);
-  for(i=0;i<n;i++) yt[i]=y[i]+hh*dyt[i];
-  (*derivs)(xh,yt,dym,model);
-  for(i=0;i<n;i++){
-    yt[i]=y[i]+h*dym[i];
-    dym[i] += dyt[i];
-  }
-  (*derivs)(x+h,yt,dyt,model);
-  for(i=0;i<n;i++)
-    yout[i]=y[i]+h6*(dydx[i]+dyt[i]+2.0*dym[i]);
-    
-  delete [] yt;
-  delete [] dyt;
-  delete [] dym;
- }
 
 
 void find_range(vector<double>& in_array,double* x_out,double* x_l,double* x_u){
 
   long i;
 
-  sort(in_array);
+  sort(in_array,N_CALC);
 
   // Get the value one sigma away from the center
   *x_l = in_array[(long)(N_CALC*0.159)];
@@ -855,206 +651,4 @@ void find_range(vector<double>& in_array,double* x_out,double* x_l,double* x_u){
 
 
 
-
-
-
-/*
-
-
-
-void iterate(double M0[4],double C[4],double sd[4],vector<double>& inc_m,vector<double>& M2_m,vector<double>& M2_min,vector<double>& M1,vector<double>& M1_err,vector<double>& M1_m,vector<double>& K,vector<double>& K_err,vector<double>& K_m,vector<double>& Porb,vector<double>& Porb_err,vector<double>& Porb_m,int print_flag,int l,ofstream* OUT,long* seed){
-  int i,j,k;
-  int n_objs;
-
-  double p1,p2,prob_part;
-  double Mf_temp,M2_temp;
-  double ran_val;
-  double M0_new[4],C_new[4],sd_new[4];
-  double C_tot;
-  double sd_inc,sd_M2;
-  
-  // Number of objects
-  n_objs = K.size();
-  
-  vector<double> inc_new(n_objs,0.0);
-  vector<double> M1_new(n_objs,0.0);
-  vector<double> M2_new(n_objs,0.0);
-  vector<double> Porb_new(n_objs,0.0);
-  vector<double> K_new(n_objs,0.0);
-
-
-
-
-  // Determine probability for current point
-
-
-  p1 = 0.0;
-  for(i=0;i<n_objs;i++){
-    prob_part = 0.0;
-
-//    prob_part += log10(gauss_prob(M1[i],1.0,M1_err[i],M1_m[i]));
-//    prob_part += log10(gauss_prob(Porb[i],1.0,Porb_err[i],Porb_m[i]));
-//    prob_part += log10(gauss_prob(K[i],1.0,K_err[i],K_m[i]));
-
-    // To make gaussians scale invariant
-//    for(j=0;j<4;j++) prob_part -= sd_m[j];
-
-    // M2 probability from model
-    for(j=0;j<4;j++) prob_part += gauss_prob(M0[j],C[j],sd[j],M2_m[i]);
-
-    // To account for inclination preference
-    prob_part *= sin(inc_m[i]);
-
-    // Determine total probability
-    p1 += log10(prob_part);
-  }
-
-  
-  
-  
-  // Find new points
-  
-  for(i=0;i<n_objs;i++){
-  
-    M1_new[i] = M1[i];
-    Porb_new[i] = Porb[i];
-    K_new[i] = K[i];
-
-    // Select a new inclination angle
-//    inc_new[i] = get_inc(seed);
-    inc_new[i] = gauss_ran(inc_m[i],0.01,seed);
-  
-    // Select new M2 by root finding    
-    Mf_temp = Porb[i]*K[i]*K[i]*K[i]/(2.0*PI*GGG);
-    M2_new[i] = rtsafe(find_M2,M2_min[i],10.0,1.0e-5,M1[i],Mf_temp,inc_new[i]);
-    
-    // inc_new[i] = asin(K_new[i]/M2_new[i] * pow((M1_new[i]+M2_new[i])*(M1_new[i]+M2_new[i]) * Porb_new[i]/(2.0*PI*GGG),1.0/3.0));
-
-
-
-  }
-
-
-  // Select new coefficient distribution parameters
-  
-  for(i=0;i<4;i++){
-    do{sd_new[i] = gauss_ran(sd[i],SD_DELTA,seed); }while(sd_new[i] < 0.0);
-  }
-
-  // Select new masses
-  // Fix M0[3],M0_new[3] at 1.4 Msun
-//  M0_new[3] = M0[3];
-  do{
-    for(i=0;i<3;i++){
-      do{ M0_new[i] = gauss_ran(M0[i],M_DELTA,seed);}while(M0_new[i] < 0.0);
-    }
-    do{ M0_new[3] = gauss_ran(M0[3],M_DELTA,seed); }while(M0_new[3]< 1.3);
-  }while(M0_new[0]>M0_new[1] || M0_new[1]>M0_new[2] || M0_new[2]>M0_new[3]);
-  
-  // Select coefficients
-  for(i=0;i<4;i++){
-    do{C_new[i] = gauss_ran(C[i],C_DELTA,seed);} while(C_new[i]<0.0);
-  }    
-  C_tot = C_new[0] + C_new[1] + C_new[2] + C_new[3];
-  for(i=0;i<4;i++) C_new[i] = C_new[i] / C_tot;
-  
-    
-
-
-
-  // Determine probability for next point
-
-  p2 = 0.0;
-  for(i=0;i<n_objs;i++){
-    prob_part = 0.0;
-
-//    prob_part += log10(gauss_prob(M1[i],1.0,M1_err[i],M1_new[i]));
-//    prob_part += log10(gauss_prob(Porb[i],1.0,Porb_err[i],Porb_new[i]));
-//    prob_part += log10(gauss_prob(K[i],1.0,K_err[i],K_new[i]));
-
-    // To make gaussians scale invariant
-//    for(j=0;j<4;j++) prob_part -= sd_new[j];
-
-    // M2 probability from model
-    for(j=0;j<4;j++) prob_part += gauss_prob(M0_new[j],C_new[j],sd_new[j],M2_new[i]);
-    
-    
-
-    // To account for inclination preference
-    prob_part *= sin(inc_new[i]);
-
-    
-    // Determine total probability
-    p2 += log10(prob_part);
-
-
-  }
- 
-
-
-  // Determine if move onto the new point
-  // a logarithmic version
-  
-  ran_val = ran3(seed);
-  if(ran_val < pow(10.0, p2 - p1)){
-
-    for(i=0;i<4;i++){
-      M0[i] = M0_new[i];
-      C[i] = C_new[i];
-      sd[i] = sd_new[i];
-    }
-    
-    inc_m = inc_new;
-    M1_m = M1_new;
-    M2_m = M2_new;
-    Porb_m = Porb_new;
-    K_m = K_new;
-
-    if(print_flag) N_accept ++;
-  }else {
-    if(print_flag) N_reject ++;
-  }
-
-  if(print_flag){
-    *OUT << setprecision(4) << l << " " << p1 << " " << p2 << " ";
-    *OUT << M0[0] << " " << C[0] << " " << sd[0] << " ";
-    *OUT << M0[1] << " " << C[1] << " " << sd[1] << " ";
-    *OUT << M0[2] << " " << C[2] << " " << sd[2] << " ";
-    *OUT << M0[3] << " " << C[3] << " " << sd[3] << " ";
-
-    *OUT << M0_new[0] << " " << C_new[0] << " " << sd_new[0] << " ";
-    *OUT << M0_new[1] << " " << C_new[1] << " " << sd_new[1] << " ";
-    *OUT << M0_new[2] << " " << C_new[2] << " " << sd_new[2] << " ";
-    *OUT << M0_new[3] << " " << C_new[3] << " " << sd_new[3] << " ";
-    
-    
-    *OUT << endl;
-  }
-
-
-}
-
-
-
-
-
-void print_results(double best_M[4],double best_C[4],double best_sd[4]){
-  int i;
-  
-  ofstream OUT;
-  OUT.open("dist_Mf_inc.dat");
-
-  cout << "Best fit is: " << endl;
-  
-  for (i=0;i<4;i++){
-    cout << "Gaussian " << i << ": Centered at M=" << best_M[i];
-    cout << " with a standard deviation, sigma=" << best_sd[i];
-    cout << " and a normalized height of c=" << best_C[i] << endl;
-  }
-
-
-}
-
-
-*/
 

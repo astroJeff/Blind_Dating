@@ -6,13 +6,13 @@ using namespace std;
 #define N_CALC 100
 
 // Model Parameters
-#define N_GAUSS 4    /* Number of Gaussians for WD distribution */
+#define N_GAUSS 1    /* Number of Gaussians for WD distribution */
 #define WD_DIST 1    /* 1-Gaussians, 2-Uniform */
 #define WD_M_MIN 0.3 /* Minimum WD mass for flat distribution */
 #define WD_M_MAX 1.2 /* Maximum WD mass for flat distribution */
 
 // NS Gaussian Parameters
-#define NS_RATE 0.2  /* Percent of stars that are NS */
+#define NS_RATE 0.0  /* Percent of stars that are NS */
 #define NS_M 1.35    /* NS mean mass adopted  */
 #define NS_SD 0.02   /* NS standard deviation adopted  */
 
