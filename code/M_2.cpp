@@ -18,7 +18,7 @@ int main(int argc, char* argv[]){
 
   long i,seed;
 
-  double P1,P2;
+  double P1,P2,Prob;
   double frac_NS,frac_NS_new;
 
   double mu[N_GAUSS];
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]){
 
 
   // Give initial values
-  initial_guess(mu,sd,w,inc,M2,M2_min,Names,M1,Porb,K,&seed);
+  initial_guess(mu,sd,w,&frac_NS,inc,M2,M2_min,Names,M1,Porb,K,&seed);
 
   OUT << "mu_1 sd_1 w_1 mu_2 sd_2 w_2 w_NS" << endl;
 
@@ -75,9 +75,9 @@ int main(int argc, char* argv[]){
 
     i=0;
     while(i<BURN_IN){
-      P1 = P_model(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
             
       if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
       i ++;
@@ -88,15 +88,16 @@ int main(int argc, char* argv[]){
 
     i = 0;
     while(i<N_CALC){
-      P1 = P_model(mu,sd,w,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+
+      for(j=0;j<N_GAUSS;j++) OUT << mu[j] << " " << sd[j] << " " << w[j] << " ";
+      OUT << P1 << endl;
       
       if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
       i ++;
-      
-      for(j=0;j<N_GAUSS;j++) OUT << mu[j] << " " << sd[j] << " " << w[j] << " ";
-      OUT << endl;
+            
     }
 
  
@@ -108,7 +109,7 @@ int main(int argc, char* argv[]){
 }
 
 
-void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
+void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
   int i;
   
   double Mf;
@@ -133,6 +134,8 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
       sd[2] = 0.05;
       w[2] = 0.08;
     }
+    
+    
 
 
 //    if(i==2){
@@ -142,6 +145,8 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
 //    }
   
   }
+  
+  *frac_NS = 0.1;
 
 /*  
   for(i=0;i<M2.size();i++){
@@ -212,11 +217,10 @@ void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],doubl
 }
 
 
-double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
   int i,j,k;
   int n_objs;
   
-  double frac_NS;
   double P1,P2,P_NS;
   double prob;
   double likelihood;
@@ -255,7 +259,6 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
     qromb(prob_M2_wrapper,0.001,2.0,1.0e-4,&P2,model);
     
     // STILL TESTING NS COMPONENT
-    frac_NS = 0.0;
     if (ADD_NS){
       P1 += prob_NS(frac_NS,M1[j],M2_min[j]); 
       P2 += prob_NS_all(frac_NS,M1[j]);  
@@ -265,7 +268,7 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
 
   }
 
-  cout << P1 << " " << P2 << " " << likelihood << endl;
+//  cout << P1 << " " << P2 << " " << likelihood << endl;
 
   return likelihood;
 
@@ -342,13 +345,17 @@ double prob_NS_all(double frac_NS, double M1){
   xmax = NS_MASS;  
   M2 = NS_MASS;
 
-  a1 = 3.0 * xmax / M2 * pow((M1+M2)*(M1+M2)*(M1+xmax),1.0/3.0);
-  a2 = -3.0 * xmin / M2 * pow((M1+M2)*(M1+M2)*(M1+xmin),1.0/3.0);
+//  a1 = 3.0 * xmax / M2 * pow((M1+M2)*(M1+M2)*(M1+xmax),1.0/3.0);
+//  a2 = -3.0 * xmin / M2 * pow((M1+M2)*(M1+M2)*(M1+xmin),1.0/3.0);
 
-  a3 = -9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmax,4.0/3.0);
-  a4 = 9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmin,4.0/3.0);
+//  a3 = -9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmax,4.0/3.0);
+//  a4 = 9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmin,4.0/3.0);
   
-  return a1+a2+a3+a4;
+  a1 = -3.0/(4.0*M2) * (3.0*M1-xmax) * (M1+xmax) * pow((M1+M2)/(M1+xmax),2.0/3.0);
+  a2 = -3.0/(4.0*M2) * (3.0*M1-xmin) * (M1+xmin) * pow((M1+M2)/(M1+xmin),2.0/3.0);
+  
+  return frac_NS*(a1-a2);
+//  return frac_NS*(a1+a2+a3+a4);
 }
 
 

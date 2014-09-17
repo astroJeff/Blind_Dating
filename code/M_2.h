@@ -4,7 +4,7 @@
 using namespace std;
 
 #define N_CALC 10000
-#define BURN_IN 0
+#define BURN_IN 200
 
 #define M2_MODEL 1 /* 1-Gaussians  */
 #define MODEL_FIX_GAUSS 0   /* 0-Allow Gaussians to move 1-Fix Gaussians  */
@@ -23,12 +23,12 @@ using namespace std;
 
 
 void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,vector<double>& M2_min,vector<double>& K,vector<double>& K_err,vector<double>& Porb,vector<double>& Porb_err);
-void initial_guess(double* mu,double* sd,double* w,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed);
+void initial_guess(double* mu,double* sd,double* w,double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed);
 
 void next_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,long* seed);
 void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS, double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new);
 
-double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed);
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed);
 
 double prob_M2_model(double model[6+3*N_GAUSS]);
 double prob_M2_wrapper(double M2_min, double* model);
