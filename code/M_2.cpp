@@ -72,31 +72,26 @@ int main(int argc, char* argv[]){
 
     // Metropolis-Hastings MCMC algorithm in here    
     // Burn in period
-
-    i=0;
-    while(i<BURN_IN){
-      P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    for(i=0;i<BURN_IN;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
       P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
             
-      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
-      i ++;
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,&P1,mu_new,sd_new,w_new,&frac_NS_new,&P2);
     }
     
     
     // Iterate for N_CALC times
 
-    i = 0;
-    while(i<N_CALC){
-      P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    for(i=0;i<N_CALC;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
       P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
 
       for(j=0;j<N_GAUSS;j++) OUT << mu[j] << " " << sd[j] << " " << w[j] << " ";
-      OUT << P1 << endl;
+      OUT << frac_NS << " " << P1 << endl;
       
-      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new);
-      i ++;
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,&P1,mu_new,sd_new,w_new,&frac_NS_new,&P2);
             
     }
 
@@ -175,7 +170,7 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],doubl
 }
 
 
-void next_point(double mu[N_GAUSS], double sd[N_GAUSS], double w[N_GAUSS], double* frac_NS, double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,long* seed){
+void next_point(double mu[N_GAUSS], double sd[N_GAUSS], double w[N_GAUSS], double* frac_NS,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,long* seed){
   int i;
   double w_tot;
   
@@ -183,27 +178,27 @@ void next_point(double mu[N_GAUSS], double sd[N_GAUSS], double w[N_GAUSS], doubl
     mu_new[i] = gauss_ran(mu[i],MOVE_MU,seed);
     sd_new[i] = gauss_ran(sd[i],MOVE_SD,seed);
     w_new[i] = gauss_ran(w[i],MOVE_W,seed);
+    while(mu_new[i] < 0.0)  mu_new[i] = gauss_ran(mu[i],MOVE_MU,seed);
+    while(sd_new[i] < 0.0)  sd_new[i] = gauss_ran(sd[i],MOVE_SD,seed);
     while(w_new[i] < 0.0)  w_new[i] = gauss_ran(w[i],MOVE_W,seed);
   }
   
   *frac_NS_new = gauss_ran(*frac_NS,MOVE_NS_FRAC,seed);
   while(*frac_NS_new < 0.0) *frac_NS_new = gauss_ran(*frac_NS,MOVE_NS_FRAC,seed);
   
-  // Neutron star element
-//  mu_new[2] = NS_MASS;
-//  sd_new[2] = 0.05;
 
+  // Renormalize so weights add to unity
   w_tot = 0.0;
   for(i=0;i<N_GAUSS;i++) w_tot += w_new[i];
-  if(ADD_NS) w_tot += *frac_NS_new;
   
   for(i=0;i<N_GAUSS;i++) w_new[i] /= w_tot;  
-  if(ADD_NS) *frac_NS_new /= w_tot;
+  if(ADD_NS) for(i=0;i<N_GAUSS;i++) w_new[i] *= (1.0 - *frac_NS_new);
+  
 
 }
 
 
-void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new){
+void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double* P1,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,double* P2){
   int i;
 
   for(i=0;i<N_GAUSS;i++){
@@ -213,6 +208,7 @@ void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],doubl
   }
   
   (*frac_NS) = (*frac_NS_new);
+  (*P1) = (*P2);
 
 }
 
@@ -258,10 +254,11 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double fr
     // Need to integrate over all M2_min
     qromb(prob_M2_wrapper,0.001,2.0,1.0e-4,&P2,model);
     
+
     // STILL TESTING NS COMPONENT
     if (ADD_NS){
       P1 += prob_NS(frac_NS,M1[j],M2_min[j]); 
-      P2 += prob_NS_all(frac_NS,M1[j]);  
+      P2 += prob_NS_all(frac_NS,M1[j]);
     }
         
     likelihood += log10(P1/P2);
