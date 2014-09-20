@@ -3,8 +3,8 @@
 
 using namespace std;
 
-#define N_CALC 10000
-#define BURN_IN 200
+#define N_CALC 50000
+#define BURN_IN 0
 
 #define M2_MODEL 1 /* 1-Gaussians  */
 #define MODEL_FIX_GAUSS 0   /* 0-Allow Gaussians to move 1-Fix Gaussians  */
@@ -14,7 +14,7 @@ using namespace std;
 #define MOVE_MU 0.02
 #define MOVE_SD 0.01
 #define MOVE_W 0.01
-#define MOVE_NS_FRAC 0.001
+#define MOVE_NS_FRAC 0.01
 
 #define NS_MASS 1.35 /* NS Mass */
 
