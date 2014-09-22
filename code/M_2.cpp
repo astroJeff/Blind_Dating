@@ -39,7 +39,6 @@ int main(int argc, char* argv[]){
   vector<double> Porb;
   vector<double> Porb_err;
   vector<double> M2_min;
-  
 
 
   
@@ -54,58 +53,57 @@ int main(int argc, char* argv[]){
   
   // Declare and initialize model variables
   n_objs = M1.size();
-
-
+  vector<double> p_NS(n_objs,0.0);
+  vector<double> p_NS_new(n_objs,0.0);
   vector<double> M2(n_objs,0.0);
   vector<double> inc(n_objs,0.0);
   vector<int> C(n_objs,0);
 
 
   // Give initial values
-  initial_guess(mu,sd,w,&frac_NS,inc,M2,M2_min,Names,M1,Porb,K,&seed);
+  initial_guess(mu,sd,w,p_NS,&frac_NS,inc,M2,M2_min,Names,M1,Porb,K,&seed);
 
-  OUT << "mu_1 sd_1 w_1 mu_2 sd_2 w_2 w_NS" << endl;
+  OUT << "Chain iteration mu_1 sd_1 w_1 w_NS Prob P(NS)_j" << endl;
 
-  // k number of walkers
-  for(k=0;k<1;k++){
+  // k number of chains
+  for(k=0;k<10;k++){
 
 
     // Metropolis-Hastings MCMC algorithm in here    
     // Burn in period
-    P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,p_NS,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
     for(i=0;i<BURN_IN;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
             
-      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,&P1,mu_new,sd_new,w_new,&frac_NS_new,&P2);
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,p_NS,&frac_NS,&P1,mu_new,sd_new,w_new,p_NS_new,&frac_NS_new,&P2);
     }
     
     
     // Iterate for N_CALC times
-
-    P1 = P_model(mu,sd,w,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,p_NS,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
     for(i=0;i<N_CALC;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
 
-      OUT << i << " ";
-      for(j=0;j<N_GAUSS;j++) OUT << mu[j] << " " << sd[j] << " " << w[j] << " ";
-      OUT << frac_NS << " " << P1 << endl;
+      OUT << k << " " << i << " ";
+      for(j=0;j<N_GAUSS;j++) OUT << setprecision(5) << mu[j] << " " << sd[j] << " " << w[j] << " ";
+      OUT << frac_NS << " " << P1 << " ";
+      for(j=0;j<p_NS.size();j++) OUT << setprecision(3) << p_NS[j] << " ";
+      OUT << endl;
       
-      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,&frac_NS,&P1,mu_new,sd_new,w_new,&frac_NS_new,&P2);
+      if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,p_NS,&frac_NS,&P1,mu_new,sd_new,w_new,p_NS_new,&frac_NS_new,&P2);
             
     }
-
  
   }
-
 
   OUT.close();
 
 }
 
 
-void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
+void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
   int i;
   
   double Mf;
@@ -194,11 +192,11 @@ void next_point(double mu[N_GAUSS], double sd[N_GAUSS], double w[N_GAUSS], doubl
   for(i=0;i<N_GAUSS;i++) w_new[i] /= w_tot;  
   if(ADD_NS) for(i=0;i<N_GAUSS;i++) w_new[i] *= (1.0 - *frac_NS_new);
   
-
+  
 }
 
 
-void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double* P1,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,double* P2){
+void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS, double* frac_NS,double* P1,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],vector<double>& p_NS_new,double* frac_NS_new,double* P2){
   int i;
 
   for(i=0;i<N_GAUSS;i++){
@@ -210,14 +208,18 @@ void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],doubl
   (*frac_NS) = (*frac_NS_new);
   (*P1) = (*P2);
 
+
+  // Move individual P(NS)'s - vector = is overloaded
+  p_NS = p_NS_new;
+
 }
 
 
-double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
   int i,j,k;
   int n_objs;
   
-  double P1,P2,P_NS;
+  double P1,P2,P_NS_1,P_NS_2;
   double prob;
   double likelihood;
   double model[6+3*N_GAUSS];
@@ -240,14 +242,17 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double fr
     // Eclipsing systems
     // TEST THIS: Should the weights be unity????
     if(Names[j] == "J0106-1000"){
+      if (ADD_NS) p_NS[j] = 0.0;
       likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.43));
       continue;
     }
     if(Names[j] == "J0651+2844"){
+      if (ADD_NS) p_NS[j] = 0.0;
       likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.50));
       continue;
     }
-    if(Names[j] == "NLTT11748"){
+    if(Names[j] == "J0345+1748"){
+      if (ADD_NS) p_NS[j] = 0.0;
       likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.76));
       continue;
     }
@@ -268,15 +273,16 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double fr
     
     // We want P(M2_min|mu,sd)
     P1 = prob_M2_model(model);
-    if (ADD_NS) P1 += prob_NS(frac_NS,M1[j],M2_min[j]); 
+    if (ADD_NS) P_NS_1 = prob_NS(frac_NS,M1[j],M2_min[j]); 
      
     // Need to integrate over all M2_min
     qromb(prob_M2_wrapper,0.001,1.4,1.0e-4,&P2,model);
-    if (ADD_NS) P2 += prob_NS_all(frac_NS,M1[j]);
+    if (ADD_NS) P_NS_2 = prob_NS_all(frac_NS,M1[j]);
 
         
-    likelihood += log10(P1/P2);
+    likelihood += log10( (P1+P_NS_1) / (P2 + P_NS_2) );
 
+    if (ADD_NS) p_NS[j] = P_NS_1 / (P_NS_1 + P1);
   }
   
 //  cout << P1 << " " << P2 << " " << likelihood << endl;
@@ -373,85 +379,10 @@ double prob_NS_all(double frac_NS, double M1){
 }
 
 
-int prob_C_model(double M2,double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],long* seed){
-  // Don't have to worry about sin(i) here - Affects all models at same M2 the same
-
-  int i;
-
-  double temp;
-  double prob_temp[N_GAUSS];
-  double prob_tot;
-  double prob_ran;
-  
-  prob_tot = 0.0;
-  for(i=0;i<N_GAUSS;i++){
-    prob_temp[i] = gauss_prob(mu[i],w[i],sd[i],M2);
-    prob_tot += prob_temp[i];
-  }
-  for(i=0;i<N_GAUSS;i++) prob_temp[i] = prob_temp[i]/prob_tot;
-
-  prob_ran = ran3(seed);
-
-  temp = 0.0;
-  for(i=0;i<N_GAUSS;i++){
-    temp += prob_temp[i];
-    if(prob_ran < temp) return i;
-  }
-  
-}
 
 
 
 
-
-
-
-
-void prob_mix_gauss(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& M2,vector<int>& C,long* seed){  
-  // To determine P( mu, sigma, w | M2, C )
-
-  int i,j;
-  int n_objs,n_C;
-  
-  double w_tot;
-  double mean;
-  
-  vector<double> obj_M2;  
-  
-  n_objs = M2.size();
-  w_tot = 0.0;
-
-
-  for(i=0;i<N_GAUSS;i++){
-  
-  
-    // Create vector of values
-    obj_M2.clear();
-    for(j=0;j<n_objs;j++) if(C[j] == i) obj_M2.push_back(M2[j]);
-    
-    
-    
-    // Determine mean and standard deviation
-    find_gauss(&mu[i],&sd[i],obj_M2);
-    
-    
-    
-    // Determine weight - draw randomly from Poisson Distribution
-    w[i] = poisson_ran(obj_M2.size(),seed);
-
-    w_tot += w[i];
-  }
-
-  // Normalize so weights all add to unity
-  for(i=0;i<N_GAUSS;i++) w[i] /= w_tot;
-    
-
-  cout << mu[0] << " " << sd[0] << " " << w[0] << endl;
-  
-
-
-
-}
 
 
 
@@ -576,7 +507,7 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
 //  IN.open("dist_07_NS.dat");
 //  IN.open("dist_flat_NS.dat");
 
-  getline(IN,line);
+//  getline(IN,line);
 
   // Read in data, add M2,min to vector M2
   while(getline(IN,line)){
@@ -619,27 +550,6 @@ double get_inc(long *seed){
   return acos(1.0 - ran3(seed));
 }
 
-
-
-
-void find_gauss(double* mean,double* sd,vector<double> vals){
-  int i, n_objs;
-	
-  n_objs = vals.size();
-
-  *mean = 0.0;
-  for(i=0;i<n_objs;i++){
-    *mean += vals[i];
-  }
-  *mean = *mean/(double)vals.size();
-
-
-  *sd = 0.0;
-  for(i=0;i<n_objs;i++) *sd += (*mean - vals[i]) * (*mean - vals[i]);
-  
-  *sd = sqrt( 1.0 / (double(n_objs) - 1.0) ) * sqrt(*sd);
-
-}
 
 
 
