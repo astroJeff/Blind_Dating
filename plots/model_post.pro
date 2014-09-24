@@ -12,14 +12,20 @@
    fin2 = dir + 'dist_07_NS.dat'
    fin3 = dir + 'dist_flat_NS.dat'
 
-
-   fin4 = dir + 'post_07.dat'
-   fin5 = dir + 'post_07_NS.dat'
-   fin6 = dir + 'post_flat_NS.dat'
+   fin4 = dir + 'posterior_07.dat'
+   fin5 = dir + 'posterior_07_NS.dat'
+   fin6 = dir + 'posterior_flat_NS.dat'
 
    fin7 = dir + 'dist_07_ana.dat'
    fin8 = dir + 'dist_07_NS_ana.dat'
    fin9 = dir + 'dist_flat_NS_ana.dat'
+
+   fin10 = dir + 'hist_P_NS_ind_07.dat'
+   fin11 = dir + 'hist_P_NS_ind_07_NS.dat'
+   fin12 = dir + 'hist_P_NS_ind_flat_NS.dat'
+
+   fin13 = dir + 'hist_trueNS_07_NS.dat'
+   fin14 = dir + 'hist_trueNS_flat_NS.dat'
 
    fout = './model_post.eps'
 
@@ -46,15 +52,20 @@
 
 ; Plot positions
 
-  pos1 = [0.06,0.70,0.31,0.97]
-  pos2 = [0.39,0.70,0.64,0.97]
-  pos3 = [0.72,0.70,0.97,0.97]
-  pos4 = [0.06,0.38,0.31,0.65]
-  pos5 = [0.39,0.38,0.64,0.65]
-  pos6 = [0.72,0.38,0.97,0.65]
-  pos7 = [0.06,0.05,0.31,0.33]
-  pos8 = [0.39,0.05,0.64,0.33]
-  pos9 = [0.72,0.05,0.97,0.33]
+  pos1 = [0.05,0.70,0.24,0.93]
+  pos2 = [0.30,0.70,0.49,0.93]
+  pos3 = [0.55,0.70,0.74,0.93]
+  pos4 = [0.79,0.70,0.98,0.93]
+
+  pos5 = [0.05,0.38,0.24,0.65]
+  pos6 = [0.30,0.38,0.49,0.65]
+  pos7 = [0.55,0.38,0.74,0.65]
+  pos8 = [0.79,0.38,0.98,0.65]
+
+  pos9 = [0.05,0.05,0.24,0.33]
+  pos10 = [0.30,0.05,0.49,0.33]
+  pos11 = [0.55,0.05,0.74,0.33]
+  pos12 = [0.79,0.05,0.98,0.33]
 
 ; Setup color table
 
@@ -77,7 +88,7 @@
 
   IF (output EQ 'PS') THEN BEGIN
      SET_PLOT, 'PS'
-     DEVICE, /LANDSCAPE,ENCAPSULATE=0, XSIZE=12,YSIZE=12,FILE=fout, SCALE=1.0, $
+     DEVICE, /LANDSCAPE,ENCAPSULATE=0, XSIZE=16,YSIZE=12,FILE=fout, SCALE=1.0, $
              /INCHES,/SCHOOLBOOK,/COLOR
   ENDIF ELSE BEGIN
      DEVICE, DECOMPOSED=0
@@ -106,6 +117,14 @@
   READCOL, fin8, h1,h2, FORMAT='F,F'
   READCOL, fin9, i1,i2, FORMAT='F,F'
 
+  
+  READCOL, fin10, j1,j2, FORMAT='F,F'
+  READCOL, fin11, k1,k2, FORMAT='F,F'
+  READCOL, fin12, l1,l2, FORMAT='F,F'
+  
+
+  READCOL, fin13, m1,m2, FORMAT='F,F'
+  READCOL, fin14, n1,n2, FORMAT='F,F'
 
 
   xmin = 0.0
@@ -126,7 +145,11 @@
 ;  OPLOT, PDF_M2_x, PDF_M2, PSYM=10, LINESTYLE=2, THICK=4
   OPLOT, PDF_M2_min_x, PDF_M2_min, PSYM=10, THICK=4
 
+;  pdf_M2_min = lindgen( N_elements()) * 0.1 + min(arr) 
+
+
   OPLOT, g1,2*g2, LINESTYLE=0, COLOR=1
+
 
 
 
@@ -144,7 +167,7 @@
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
      COLOR=0, POSITION=pos2, /NODATA, /NOERASE
   
-  CONTOUR_PLUS,d3,d4,XBINSIZE=0.1,YBINSIZE=0.05,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
+  CONTOUR_PLUS,d3,d4,XBINSIZE=0.03,YBINSIZE=0.03,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
 
   mu_true = FINDGEN(1)
   sd_true = FINDGEN(1)
@@ -173,7 +196,7 @@
   ymin = 0.00
   ymax = 0.10
 
-  xlab = 'NS Probability'
+  xlab = 'NS Fraction'
   ylab = 'N'
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
@@ -184,6 +207,28 @@
   pdf_NS = pdf_NS/N_ELEMENTS(d1)
 
   OPLOT, PDF_NS_x, PDF_NS, PSYM=10
+
+
+
+; Individual System NS Probability
+
+  xmin = 0.0
+  xmax = 1.0
+  ymin = 0.00
+  ymax = 80.0
+
+  xlab = 'NS Probability'
+  ylab = 'N'
+
+  PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
+     XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
+     COLOR=0, POSITION=pos4, /NODATA, /NOERASE
+
+
+;  pdf_NS = float(HISTOGRAM(j1,MIN=xmin,MAX=xmax,BINSIZE=0.02,LOCATIONS=pdf_NS_x))
+
+  OPLOT, j1, j2, PSYM=10
+
 
 
 
@@ -203,7 +248,7 @@
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos4, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos5, /NODATA, /NOERASE
 
   pdf_M2 = HISTOGRAM(b4,MIN=xmin,MAX=xmax,BINSIZE=0.1,LOCATIONS=pdf_M2_x)
   pdf_M2_min = HISTOGRAM(b5,MIN=xmin,MAX=xmax,BINSIZE=0.1,LOCATIONS=pdf_M2_min_x)
@@ -212,6 +257,9 @@
   OPLOT, PDF_M2_min_x, PDF_M2_min, PSYM=10, THICK=4
 
   OPLOT, h1,2*h2, LINESTYLE=0, COLOR=1
+
+
+
 
 
 ; Gaussian parameters posterior
@@ -227,15 +275,15 @@
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos5, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos6, /NODATA, /NOERASE
 
-  CONTOUR_PLUS,e3,e4,XBINSIZE=0.1,YBINSIZE=0.05,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
+  CONTOUR_PLUS,e3,e4,XBINSIZE=0.03,YBINSIZE=0.03,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
 
   OPLOT,mu_true,sd_true,PSYM=7,SYMSIZE=2.0
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos5, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos6, /NODATA, /NOERASE
 
 
 ; NS Probability Posterior
@@ -245,15 +293,47 @@
   ymin = 0.00
   ymax = 0.10
 
+  xlab = 'NS Fraction'
+  ylab = 'N'
+
+  PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
+     XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
+     COLOR=0, POSITION=pos7, /NODATA, /NOERASE
+
+  pdf_NS = float(HISTOGRAM(e6,MIN=xmin,MAX=xmax,BINSIZE=0.005,LOCATIONS=pdf_NS_x))
+  OPLOT, PDF_NS_x, PDF_NS/N_ELEMENTS(e1), PSYM=10
+
+
+
+; Individual System NS Probability
+
+  xmin = 0.0
+  xmax = 1.0
+  ymin = 0.00
+  ymax = 60.0
+
   xlab = 'NS Probability'
   ylab = 'N'
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos6, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos8, /NODATA, /NOERASE
 
-  pdf_NS = float(HISTOGRAM(e6,MIN=xmin,MAX=xmax,BINSIZE=0.005,LOCATIONS=pdf_NS_x))
-  OPLOT, PDF_NS_x, PDF_NS/N_ELEMENTS(e1), PSYM=10
+;  pdf_NS = float(HISTOGRAM(k1,MIN=xmin,MAX=xmax,BINSIZE=0.02,LOCATIONS=pdf_NS_x))
+;  pdf_true_NS = float(HISTOGRAM(m1,MIN=xmin,MAX=xmax,BINSIZE=0.02,LOCATIONS=pdf_true_NS_x))
+
+  
+
+  OPLOT, k1, k2, PSYM=10
+  dx = (m1[2]-m1[1])/2.0
+  FOR i=0, N_ELEMENTS(m2)-1, 1 DO BEGIN
+     POLYFILL, [m1[i]-dx,m1[i]-dx,m1[i]+dx,m1[i]+dx,m1[i]-dx], [0,m2[i],m2[i],0,0], COLOR=2
+  ENDFOR
+
+
+
+
+
 
 
 
@@ -272,7 +352,7 @@
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos7, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos9, /NODATA, /NOERASE
 
   pdf_M2 = HISTOGRAM(c4,MIN=xmin,MAX=xmax,BINSIZE=0.1,LOCATIONS=pdf_M2_x)
   pdf_M2_min = HISTOGRAM(c5,MIN=xmin,MAX=xmax,BINSIZE=0.1,LOCATIONS=pdf_M2_min_x)
@@ -296,13 +376,13 @@
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos8, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos10, /NODATA, /NOERASE
 
-  CONTOUR_PLUS,f3,f4,XBINSIZE=0.1,YBINSIZE=0.05,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
+  CONTOUR_PLUS,f3,f4,XBINSIZE=0.03,YBINSIZE=0.03,XMIN=xmin,XMAX=xmax,YMIN=ymin,YMAX=ymax,PMINY=ymin,PMAXY=ymax,MINX=xmin,PMAXX=xmax,THRESHOLD=1,/INTERP,/NODATA,/NOERASE,/NOCONT
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos8, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos10, /NODATA, /NOERASE
 
 
 
@@ -313,17 +393,43 @@
   ymin = 0.00
   ymax = 0.10
 
-  xlab = 'NS Probability'
+  xlab = 'NS Fraction'
   ylab = 'N'
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
      XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
-     COLOR=0, POSITION=pos9, /NODATA, /NOERASE
+     COLOR=0, POSITION=pos11, /NODATA, /NOERASE
 
 
   pdf_NS = float(HISTOGRAM(f6,MIN=xmin,MAX=xmax,BINSIZE=0.005,LOCATIONS=pdf_NS_x))
   OPLOT, PDF_NS_x, PDF_NS/N_ELEMENTS(f1), PSYM=10
 
+
+
+; Individual System NS Probability
+
+  xmin = 0.0
+  xmax = 1.0
+  ymin = 0.00
+  ymax = 40.0
+
+  xlab = 'NS Probability'
+  ylab = 'N'
+
+  PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
+     XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
+     COLOR=0, POSITION=pos12, /NODATA, /NOERASE
+
+;  pdf_NS = float(HISTOGRAM(l1,MIN=xmin,MAX=xmax,BINSIZE=0.02,LOCATIONS=pdf_NS_x))
+;  pdf_true_NS = float(HISTOGRAM(m1,MIN=xmin,MAX=xmax,BINSIZE=0.02,LOCATIONS=pdf_true_NS_x))
+
+
+  OPLOT, l1, l2, PSYM=10
+
+  dx = (n1[2]-n1[1])/2.0
+  FOR i=0, N_ELEMENTS(n2)-1, 1 DO BEGIN
+     POLYFILL, [n1[i]-dx,n1[i]-dx,n1[i]+dx,n1[i]+dx,n1[i]-dx], [0,n2[i],n2[i],0,0], COLOR=2
+  ENDFOR
 
 
 

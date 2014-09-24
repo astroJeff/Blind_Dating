@@ -10,7 +10,8 @@
 
    fin1 = dir + 'ELM_WD.dat'
 
-   fin2 = dir + 'ELM_post.dat'
+   fin2 = dir + 'ELM_post.dat.old'
+   fin3 = dir + 'ELM_post.dat'
 
    fout = './ELM_post.eps'
 
@@ -39,9 +40,10 @@
 
 ; Plot positions
 
-  pos1 = [0.06,0.15,0.31,0.93]
-  pos2 = [0.39,0.15,0.64,0.93]
-  pos3 = [0.72,0.15,0.97,0.93]
+  pos1 = [0.05,0.15,0.24,0.93]
+  pos2 = [0.30,0.15,0.49,0.93]
+  pos3 = [0.55,0.15,0.74,0.93]
+  pos4 = [0.79,0.15,0.98,0.93]
 
 ; Setup color table
 
@@ -64,7 +66,7 @@
 
   IF (output EQ 'PS') THEN BEGIN
      SET_PLOT, 'PS'
-     DEVICE, /LANDSCAPE,ENCAPSULATE=0, XSIZE=12,YSIZE=4,FILE=fout, SCALE=1.0, $
+     DEVICE, /LANDSCAPE,ENCAPSULATE=0, XSIZE=15,YSIZE=4,FILE=fout, SCALE=1.0, $
              /INCHES,/SCHOOLBOOK,/COLOR
   ENDIF ELSE BEGIN
      DEVICE, DECOMPOSED=0
@@ -83,7 +85,14 @@
            a11,a12, FORMAT='A,F,F,F,F,F,F,F,F,F,F,F'
 
   READCOL, fin2, b1,b2,b3,b4,b5,b6, FORMAT='F,F,F,F,F,F'
-
+  READCOLEVENMORE, fin3, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10, $
+                   c11,c12,c13,c14,c15,c16,c17,c18,c19,c20, $
+                   c21,c22,c23,c24,c25,c26,c27,c28,c29,c30, $
+                   c31,c32,c33,c34,c35,c36,c37,c38,c39,c40, $
+                   c41,c42,c43,c44,c45,c46,c47,c48,c49,c50, $
+                   c51,c52,c53,c54,c55,c56,c57,c58,c59,c60, $
+                   c61,c62, $
+                   FORMAT='F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F,F'
 
 
 
@@ -139,7 +148,7 @@
   ymin = 0.00
   ymax = 0.07
 
-  xlab = 'NS Probability'
+  xlab = 'NS Fraction'
   ylab = 'N'
 
   PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
@@ -155,6 +164,27 @@
 
 
 
+  ind_sys = [[c8],[c9],[c10],[c11],[c12],[c13],[c14],[c15],[c16],[c17],[c18],[c19],[c20],[c21],[c22],[c23],[c24],[c25],[c26],[c27],[c28],[c29],[c30],[c31],[c32],[c33],[c34],[c35],[c36],[c37],[c38],[c39],[c40],[c41],[c42],[c43],[c44],[c45],[c46],[c47],[c48],[c49],[c50],[c51],[c52],[c53],[c54],[c55],[c56],[c57],[c58],[c59],[c60],[c61],[c62]]
+  
+  p_NS_mean = mean(ind_sys,DIMENSION=1)
+  p_NS_sd = stddev(ind_sys,DIMENSION=1)
+
+
+  xmin = 0.0
+  xmax = 1.0
+  ymin = 0.0
+  ymax = 25.0
+
+  xlab = 'NS Probability'
+  ylab = "N"
+
+  PLOT, [0], [0], XRANGE=[xmin,xmax], YRANGE=[ymin,ymax],     $
+     XSTYLE=1, YSTYLE=1, XTITLE=xlab, YTITLE=ylab,  $
+     COLOR=0, POSITION=pos4, /NODATA, /NOERASE
+
+  pdf_NS = float(HISTOGRAM(p_NS_mean,MIN=xmin,MAX=xmax,BINSIZE=0.05,LOCATIONS=pdf_NS_x))
+
+  OPLOT,pdf_NS_x,pdf_NS,PSYM=10
 
 
 ; Close ps-file
