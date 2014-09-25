@@ -1,5 +1,6 @@
 #include<iostream>
 #include<cmath>
+#include<vector>
 #include"integrators.h"
 
 using namespace std;
@@ -87,7 +88,8 @@ void qromb(double (*func)(double, double *), double x1, double x2, double eps, d
 
   }
 
-  cerr << "Too many steps in qromb" << endl;
+//  cerr << "Too many steps in qromb" << endl;
+  cerr << "Too many steps in qromb " << model[6]<< " " << model[7] << " " << model[8] << endl;
 
 }
 
@@ -252,4 +254,211 @@ void polint(double* xa,double* ya,int n,double x,double* y,double* dy){
   
   delete [] c;
   delete [] d;
+}
+
+
+
+void rk4(double *y, double *dydx, int n, double x, double h, double *yout, double* model,
+         void (*derivs)(double, double *, double *, double *))
+{
+  int i;
+  double xh,hh,h6,*dym,*dyt,*yt;
+
+  dym = new double[n];
+  dyt = new double[n];
+  yt = new double[n];
+
+  hh=h*0.5;
+  h6=h/6.0;
+  xh=x+hh;
+  for (i=0;i<n;i++) yt[i]=y[i]+hh*dydx[i];
+  (*derivs)(xh,yt,dyt,model);
+  for(i=0;i<n;i++) yt[i]=y[i]+hh*dyt[i];
+  (*derivs)(xh,yt,dym,model);
+  for(i=0;i<n;i++){
+    yt[i]=y[i]+h*dym[i];
+    dym[i] += dyt[i];
+  }
+  (*derivs)(x+h,yt,dyt,model);
+  for(i=0;i<n;i++)
+    yout[i]=y[i]+h6*(dydx[i]+dyt[i]+2.0*dym[i]);
+    
+  delete [] yt;
+  delete [] dyt;
+  delete [] dym;
+ }
+
+
+void rkdumb(double *vstart, int nvar, double x1, double x2, int nstep, double* x_cur,double* model,
+            void (*derivs)(double, double *, double *, double *))
+{
+  int i,k;
+  double x,h;
+  double *v,*vout,*dv;
+
+  v = new double[nvar];
+  vout = new double[nvar];
+  dv = new double[nvar];
+
+  for (i=0;i<nvar;i++){
+    v[i]=vstart[i];
+  }
+  x=x1;
+  h=(x2-x1)/nstep;
+
+  for (k=0;k<nstep;k++){
+    (*derivs)(x,v,dv,model);
+        
+    rk4(v,dv,nvar,x,h,vout,model,derivs);
+    
+    if((double)(x+h) == x) cerr << "Step size too small in routine rkdumb" << endl;
+    x += h;
+    (*x_cur) = x;
+    for (i=0;i<nvar;i++){
+      v[i]=vout[i];
+    }
+  }
+
+  if (k==nstep)  for (i=0;i<nvar;i++) vstart[i]=v[i];
+      
+  delete [] dv;
+  delete [] vout;
+  delete [] v;
+}
+
+double rtsafe(void (*funcd)(double,double *,double *,double *),double x1,double x2,double xacc,double* model){
+  int j;
+  double df,dx,dxold,f,fh,fl;
+  double temp,xh,xl,rts;
+  
+  (*funcd)(x1,&fl,&df,model);
+  (*funcd)(x2,&fh,&df,model);
+  if ((fl > 0.0 && fh > 0.0) || (fl < 0.0 && fh < 0.0)) cerr << "Root must be bracketed in rtsafe" << endl;
+  
+  if (fl == 0.0) return x1;
+  if (fh == 0.0) return x2;
+  if (fl < 0.0) {
+    xl=x1;
+    xh=x2;
+  } else {
+    xh=x1;
+    xl=x2;
+  }
+  rts=0.5*(x1+x2);
+  dxold=fabs(x2-x1);
+  dx=dxold;
+  (*funcd)(rts,&f,&df,model);
+  for (j=1;j<=MAXIT;j++) {
+    if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0)
+        || (fabs(2.0*f) > fabs(dxold*df))) {
+      dxold=dx;
+      dx=0.5*(xh-xl);
+      rts=xl+dx;
+      if (xl == rts) return rts;
+    } else {
+      dxold=dx;
+      dx=f/df;
+      temp=rts;
+      rts -= dx;
+      if (temp == rts) return rts;
+    }
+    if (fabs(dx) < xacc) return rts;
+    (*funcd)(rts,&f,&df,model);
+    if (f < 0.0)
+      xl=rts;
+    else
+      xh=rts;
+  }
+  cerr << "Maximum number of iterations exceeded in rtsafe" << endl;
+  return 0.0;
+}
+
+
+void sort(vector<double>& x,long n_objs){
+  // Heapsort algorithm
+
+  long e,i,j,k,l;
+
+  double tmp;
+
+  e = n_objs-1;
+
+  // Build heap
+  i = (int)(e/2);
+  while(i>=0){
+    j = i;
+    while(j*2+1<=e){
+      k = j*2+1;
+      l = j;
+      if(x[l] < x[k]) l = k;
+      if(k+1 <= e && x[l] < x[k+1]) l = k+1;
+      if(l!=j){
+        tmp = x[j];
+        x[j] = x[l];
+        x[l] = tmp;
+        j = l;
+      } else break;
+    }
+    i--;
+  }
+
+  // Sort heap
+  while(e>0){
+    tmp = x[e];
+    x[e] = x[0];
+    x[0] = tmp;
+    e--;
+    
+    j = 0;
+    while(j*2+1<=e){
+      k = j*2+1;
+      l = j;
+      if(x[l] < x[k]) l = k;
+      if(k+1 <= e && x[l] < x[k+1]) l = k+1;
+      if(l != j){
+        tmp = x[j];
+        x[j] = x[l];
+        x[l] = tmp;
+        j = l;
+      }else break;
+    }
+  }
+}
+
+
+double ran3(long *idum){ 
+  static int inext, inextp;
+  static long ma[56];
+  static int iff=0;
+  long mj, mk;
+  int i, ii, k;
+  
+  if(*idum < 0 || iff == 0){
+    iff=1;
+    mj = (long)abs(MSEED-abs((double)*idum));
+    mj = mj % (long)MBIG;
+    ma[55]=mj;
+    mk=1;
+    for(i=1;i<=54;i++){
+      ii = (21*i) % 55;
+      ma[ii] = mk;
+      mk = mj - mk;
+      if(mk < MZ) mk += (long)MBIG;
+      mj = ma[ii];
+    }
+    for(k=1;k<=4;k++)
+      for(i=1;i<=55;i++){
+        ma[i] -= ma[1+(i+30) % 55];
+        if(ma[i] < MZ) ma[i] += (long)MBIG;
+      }
+    inext=0;
+    inextp=31;
+    *idum=1;
+  }
+  if(++inext == 56) inext = 1;
+  if(++inextp == 56) inextp = 1;
+  mj=ma[inext]-ma[inextp];
+  if(mj < MZ) mj += (long)MBIG;
+  ma[inext]=mj;
+  return mj*FAC;
 }
