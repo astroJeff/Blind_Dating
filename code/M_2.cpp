@@ -33,13 +33,11 @@ int main(int argc, char* argv[]){
   // Observations
   vector<string> Names;
   vector<double> M1;
-  vector<double> M1_err;
   vector<double> K;
-  vector<double> K_err;
   vector<double> Porb;
-  vector<double> Porb_err;
   vector<double> M2_min;
-
+  vector<double> inc_max;
+  vector<string> inc_name;
 
   
   seed = time(NULL);
@@ -48,7 +46,7 @@ int main(int argc, char* argv[]){
 
 
   // Take in data
-  read_data(Names,M1,M1_err,M2_min,K,K_err,Porb,Porb_err);
+  read_data(Names,M1,K,Porb,inc_max,inc_name);
 
   
   // Declare and initialize model variables
@@ -56,12 +54,10 @@ int main(int argc, char* argv[]){
   vector<double> p_NS(n_objs,0.0);
   vector<double> p_NS_new(n_objs,0.0);
   vector<double> M2(n_objs,0.0);
-  vector<double> inc(n_objs,0.0);
-  vector<int> C(n_objs,0);
 
 
   // Give initial values
-  initial_guess(mu,sd,w,p_NS,&frac_NS,inc,M2,M2_min,Names,M1,Porb,K,&seed);
+  initial_guess(mu,sd,w,p_NS,&frac_NS,inc_max,inc_name,M2,M2_min,Names,M1,Porb,K,&seed);
 
   OUT << "Chain iteration mu_1 sd_1 w_1 w_NS Prob P(NS)_j" << endl;
 
@@ -71,10 +67,10 @@ int main(int argc, char* argv[]){
 
     // Metropolis-Hastings MCMC algorithm in here    
     // Burn in period
-    P1 = P_model(mu,sd,w,p_NS,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,p_NS,frac_NS,M2,M2_min,Names,M1,K,Porb,&seed);
     for(i=0;i<BURN_IN;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,M2,M2_min,Names,M1,K,Porb,&seed);
             
       if(ran3(&seed) < pow(10.0,P2-P1)) move_to_point(mu,sd,w,p_NS,&frac_NS,&P1,mu_new,sd_new,w_new,p_NS_new,&frac_NS_new,&P2);
     }
@@ -82,10 +78,10 @@ int main(int argc, char* argv[]){
     
     // Iterate for N_CALC times
     accept = 0;
-    P1 = P_model(mu,sd,w,p_NS,frac_NS,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+    P1 = P_model(mu,sd,w,p_NS,frac_NS,M2,M2_min,Names,M1,K,Porb,&seed);
     for(i=0;i<N_CALC;i++){
       next_point(mu,sd,w,&frac_NS,mu_new,sd_new,w_new,&frac_NS_new,&seed);
-      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,inc,M2,C,M2_min,Names,M1,K,Porb,&seed);
+      P2 = P_model(mu_new,sd_new,w_new,p_NS_new,frac_NS_new,M2,M2_min,Names,M1,K,Porb,&seed);
 
       OUT << k+1 << " " << i+1 << " ";
       for(j=0;j<N_GAUSS;j++) OUT << setprecision(5) << mu[j] << " " << sd[j] << " " << w[j] << " ";
@@ -108,8 +104,9 @@ int main(int argc, char* argv[]){
 }
 
 
-void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
-  int i;
+void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double* frac_NS,vector<double>& inc_max,vector<string>& inc_name,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed){
+
+  int i,j;
   
   double Mf;
   double model[3];
@@ -139,6 +136,7 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
   *frac_NS = 0.1;
 
 
+
 // To set M2_min for each object
 
   for(i=0;i<M2.size();i++){
@@ -151,24 +149,25 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
     
     M2_min.push_back(rtsafe(find_M2,0.001,3.0,1.0e-6,model));
     
+
+    // To use constraints based on non-detection of eclipses
+    if(USE_INC){
+      for(j=0;j<inc_max.size();j++){
+	if(!Names[i].compare(inc_name[j])){
+	  model[2] = inc_max[j] * PI / 180.0;
+	  M2_min[i] = rtsafe(find_M2,0.001,3.0,1.0e-6,model);
+	}
+      }
+    }
+
+    // To require that M2 > M1 because the observed WD must
+    // be the less massive one (inverse M-R relation)
+    if(M2_GT_M1){
+      if(M2_min[i] < M1[i]) M2_min[i] = M1[i];
+    }
+    
   }
 
-
-/*
-
-    inc[i] = get_inc(seed);
-
-    cout << i << " " << K[i] << " " << M2_min[i] << endl;
-
-    model[2] = inc[i];
-    M2[i] = rtsafe(find_M2,M2_min[i],10.0,1.0e-5,model);
-
-    if(Names[i] == "J0106-1000") M2[i] = 0.43;
-    if(Names[i] == "J0651+2844") M2[i] = 0.50;
-    if(Names[i] == "NLTT11748") M2[i] = 0.76;    
-
-  }
-*/
   
 }
 
@@ -220,7 +219,7 @@ void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
 }
 
 
-double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double frac_NS,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed){
   int i,j,k;
   int n_objs;
   
@@ -246,9 +245,9 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
   
     // Eclipsing systems
     // TEST THIS: Should the weights be unity????
-    if(Names[j] == "J0106-1000"){
+    if(Names[j] == "J0751-0141"){
       if (ADD_NS) p_NS[j] = 0.0;
-      likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.43));
+      likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.97));
       continue;
     }
     if(Names[j] == "J0651+2844"){
@@ -258,7 +257,7 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
     }
     if(Names[j] == "J0345+1748"){
       if (ADD_NS) p_NS[j] = 0.0;
-      likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.76));
+      likelihood += log10(gauss_prob(mu[0],w[0],sd[0],0.72));
       continue;
     }
 
@@ -308,24 +307,6 @@ double prob_M2_model(double model[6+3*N_GAUSS]){
   double mu,sd,w;
   double M2_prob;
 
-/*
-  model[0] = M1;
-  model[1] = K;
-  model[2] = Porb;
-  model[3] = 1.0;   // This is where "A" goes
-  model[4] = M2_min;
-  model[5] = 0.0;
-
-
-  model[6] = mu;
-  model[7] = sd;
-  model[8] = w;
-
-*/
-
-//  if(Name == "J0106-1000") return 0.43;
-//  if(Name == "J0651+2844") return 0.50;
-//  if(Name == "NLTT11748") return 0.76;
 
   // Normalize the function
   M2_prob = 0.0;
@@ -491,15 +472,18 @@ void integrate_M2(double M2, double* f, double* df, double* model){
 
 
 
-void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,vector<double>& M2_min,vector<double>& K,vector<double>& K_err,vector<double>& Porb,vector<double>& Porb_err){
+void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,vector<double>& inc_max,vector<string>& inc_name){
+
+  int i, j;
+
   fstream IN;
   
-  double M1_temp, M1_err_temp;
-  double K_temp, K_err_temp;
-  double P_temp, P_err_temp;
-  double M2_min_temp;
-  
-  string Name_temp,line;
+  double M1_temp;
+  double K_temp;
+  double P_temp;
+
+  string line;
+  string Name_temp;
   
   vector<string> data;
   
@@ -508,9 +492,6 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
 
   // Open data file
   IN.open("ELM_WD.dat");
-//  IN.open("dist_1_gauss.dat");
-//  IN.open("dist_07_NS.dat");
-//  IN.open("dist_flat_NS.dat");
 
 //  getline(IN,line);
 
@@ -522,21 +503,15 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
     
     Name_temp = data[0];
     P_temp = strtof(data[1]);
-    P_err_temp = strtof(data[2]);
     K_temp = strtof(data[3]);
-    K_err_temp = strtof(data[4]);
     M1_temp = strtof(data[7]);
-    M1_err_temp = 0.02;  
 
     // Don't worry about non-detections yet
     if (P_temp > 0.001){
       Names.push_back(Name_temp);
       Porb.push_back(P_temp);
-      Porb_err.push_back(P_err_temp);
       K.push_back(K_temp);
-      K_err.push_back(K_err_temp);      
       M1.push_back(M1_temp);
-      M1_err.push_back(M1_err_temp);
     }
     
 //    Names.push_back(data[3]);
@@ -547,9 +522,29 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,v
     
 
   }
-  
   IN.close();
+
+
+
+  IN.open("ELM_inc.dat");
+  
+  // Get rid of header
+  getline(IN,line);
+
+  while(getline(IN,line)){
+
+    split(line,data);
+
+    inc_name.push_back(data[0]);
+    inc_max.push_back(strtof(data[1]));
+  }
+
+  IN.close();
+
+
 }
+
+
 
 double get_inc(long *seed){
   return acos(1.0 - ran3(seed));

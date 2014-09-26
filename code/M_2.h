@@ -10,6 +10,10 @@ using namespace std;
 #define MODEL_FIX_GAUSS 0   /* 0-Allow Gaussians to move 1-Fix Gaussians  */
 #define N_GAUSS 1
 #define ADD_NS 1 /* Include a NS component */ 
+#define USE_INC 1  /* Allow constraints from non-detection of eclipses */
+                   /* Values taken from Hermes et al. (2014)  */
+#define M2_GT_M1 1  /* Only allow solutions in which M2 > M1 */
+                    /* This is because the observed WD must be lighter */
 
 #define MOVE_MU 0.1
 #define MOVE_SD 0.08
@@ -22,13 +26,13 @@ using namespace std;
 #define GGG 1.536e6  /* Newton's Gravitational Constant in (km/s)^3 days Msun^(-1) */
 
 
-void read_data(vector<string>& Names,vector<double>& M1,vector<double>& M1_err,vector<double>& M2_min,vector<double>& K,vector<double>& K_err,vector<double>& Porb,vector<double>& Porb_err);
-void initial_guess(double* mu,double* sd,double* w,vector<double>& p_NS,double* frac_NS,vector<double>& inc,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed);
+void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,vector<double>& inc_max,vector<string>& inc_name);
+void initial_guess(double* mu,double* sd,double* w,vector<double>& p_NS,double* frac_NS,vector<double>& inc_max,vector<string>& inc_name,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& Porb,vector<double>& K,long* seed);
 
 void next_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],double* frac_NS,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],double* frac_NS_new,long* seed);
 void move_to_point(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double* frac_NS, double* P1,double mu_new[N_GAUSS],double sd_new[N_GAUSS],double w_new[N_GAUSS],vector<double>& p_NS_new,double* frac_NS_new,double* P2);
 
-double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double frac_NS,vector<double>& inc,vector<double>& M2,vector<int>& C,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed);
+double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<double>& p_NS,double frac_NS,vector<double>& M2,vector<double>& M2_min,vector<string>& Names,vector<double>& M1,vector<double>& K,vector<double>& Porb,long* seed);
 
 double prob_M2_model(double model[6+3*N_GAUSS]);
 double prob_M2_wrapper(double M2_min, double* model);
