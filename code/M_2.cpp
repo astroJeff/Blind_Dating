@@ -39,10 +39,11 @@ int main(int argc, char* argv[]){
   vector<double> inc_max;
   vector<string> inc_name;
 
+
   
   seed = time(NULL);
   
-  OUT.open("ELM_post.dat");
+  OUT.open("post_09_NS.dat");
 
 
   // Take in data
@@ -114,7 +115,7 @@ void initial_guess(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vecto
   for(i=0;i<N_GAUSS;i++){
     if(i==0){
       mu[0] = 0.90;    // High mass WD
-      sd[0] = 0.20;
+      sd[0] = 0.30;
       w[0] = 0.90;
     }
 
@@ -223,11 +224,12 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
   int i,j,k;
   int n_objs;
   
+  double mf,mf_max;
+  double mf1_3,Mtot4_3;
   double P1,P2,P_NS_1,P_NS_2;
   double prob;
   double likelihood;
-  double model[6+3*N_GAUSS];
-  double NS_model[2];
+  double model[7+3*N_GAUSS];
   
   n_objs = K.size();
 
@@ -235,9 +237,9 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
   likelihood = 0.0;
   
   for(i=0;i<N_GAUSS;i++){
-    model[3*i+6] = mu[i];
-    model[3*i+7] = sd[i];
-    model[3*i+8] = w[i];
+    model[3*i+7] = mu[i];
+    model[3*i+8] = sd[i];
+    model[3*i+9] = w[i];
   }
   
 
@@ -261,35 +263,38 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
       continue;
     }
 
-  
+
+    mf = Porb[j] * K[j]*K[j]*K[j] / (2.0*PI*GGG);
   
     model[0] = M1[j];
     model[1] = K[j];
     model[2] = Porb[j];
-    model[3] = 1.0;   // This is where "A" goes
+    model[3] = mf;      // Mass function
     model[4] = M2_min[j];
     model[5] = frac_NS;  // Fraction of NS
+    model[6] = pow(mf,1.0/3.0); // Mass function to the 1/3 power
 
-    if(ADD_NS){
-      NS_model[0] = frac_NS;
-      NS_model[1] = M1[j];
-    }
-    
+
     // We want P(M2_min|mu,sd)
     P1 = prob_M2_model(model);
-    if (ADD_NS) P_NS_1 = prob_NS(frac_NS,M1[j],M2_min[j]); 
-     
-    // Need to integrate over all M2_min
-    qromb(prob_M2_wrapper,0.001,1.4,1.0e-4,&P2,model);
-    if (ADD_NS) P_NS_2 = prob_NS_all(frac_NS,M1[j]);
+    if (ADD_NS) P_NS_1 = prob_NS(model); 
 
-        
+
+    /*
+    // Need to integrate over all mf
+    mf_max = 2.0*2.0*2.0 / ((M1[j]+2.0) * (M1[j]+2.0));
+    qromb(prob_Mf_wrapper,0.001,mf_max,1.0e-3,&P2,model);
+    if (ADD_NS) P_NS_2 = prob_NS_all(frac_NS,M1[j]);
+                 
     likelihood += log10( (P1+P_NS_1) / (P2 + P_NS_2) );
+*/
+
+    likelihood += log10( P1 + P_NS_1 );
 
     if (ADD_NS) p_NS[j] = P_NS_1 / (P_NS_1 + P1);
+    
   }
   
-//  cout << P1 << " " << P2 << " " << likelihood << endl;
 
   return likelihood;
 
@@ -297,7 +302,7 @@ double P_model(double mu[N_GAUSS],double sd[N_GAUSS],double w[N_GAUSS],vector<do
 
 
 
-double prob_M2_model(double model[6+3*N_GAUSS]){
+double prob_M2_model(double* model){
   //  P( M2[j] | mu, sd, w, M2_min[j] )
 
   int i,j;
@@ -311,32 +316,79 @@ double prob_M2_model(double model[6+3*N_GAUSS]){
   // Normalize the function
   M2_prob = 0.0;
   M2_min = model[4];
-  
+
   // Integrate over full range [M2_min,5.0] to get total probability
-  qromb(eval_M2,M2_min,3.0,1.0e-5,&M2_prob,model);
+  qromb(eval_M2,M2_min+0.001,3.0,1.0e-3,&M2_prob,model);
   
   return M2_prob;
 
 }
 
 
-double prob_M2_wrapper(double M2_min, double* model){ 
+double prob_Mf_wrapper(double Mf, double* model){ 
+  double M2_min,M1;
+  double model_temp[3];
+  double temp_prob;
   
-  model[4] = M2_min;  
+  M1 = model[0];
+  
+  // To solve for M2_min for each Mf
+  model_temp[0] = M1;
+  model_temp[1] = Mf;
+  model_temp[2] = PI/2.0;
 
-  return prob_M2_model(model);  
+  M2_min = rtsafe(find_M2,0.001,5.0,1.0e-4,model_temp);
+
+  // Add each Mf, M2_min to the model
+  model[3] = Mf;
+  model[4] = M2_min;
+  model[6] = pow(Mf,1.0/3.0);
+
+  temp_prob = prob_M2_model(model);
+
+  return temp_prob;  
 }
 
 
 
-double prob_NS(double frac_NS, double M1, double M2_min){
+double prob_NS(double* model){
   // P(NS) = sin(i)
-  double M2 = NS_MASS;
-  double prob;
 
-  prob = frac_NS * pow((M1+M2)/(M1+M2_min), 2.0/3.0) * M2_min / M2;
+  int i;
+  
+  double M1,M2,frac_NS,mf;
+  double prob, M2_min;
+  double NS_model[7+3*N_GAUSS];
+  
+  M1 = model[0];
+  mf = model[3];
+  M2_min = model[4];
+  M2 = NS_MASS;
+  frac_NS = model[5];
+
+
+
+  if(NS_MODEL){
+    // Modeling the NS distribution as a Gaussian
+
+    for(i=0;i<7+3*N_GAUSS;i++) NS_model[i] = model[i];
+
+    NS_model[7] = NS_MASS;
+    NS_model[8] = 0.1;
+    NS_model[9] = frac_NS;
+
+    qromb(eval_M2,M2_min+0.001,3.0,1.0e-3,&prob,NS_model);
+
+  }else {
+    // Modeling the NS distribution as a delta function
+
+    prob = frac_NS * pow(M1+M2,4.0/3.0) / (3.0*pow(mf,1.0/3.0) * M2 * sqrt(M2*M2 - pow(mf*(M1+M2)*(M1+M2),2.0/3.0)));
  
-  return (M2_min < M2) ? prob : 0.0;
+    return (M2_min < M2) ? prob : 0.0;
+  }  
+
+
+
 }
 
 
@@ -347,9 +399,9 @@ double prob_NS_all(double frac_NS, double M1){
   double M2;
   double a1,a2,a3,a4;
 
-  xmin = 0.0;
-  xmax = NS_MASS;  
-  M2 = NS_MASS;
+//  xmin = 0.0;
+//  xmax = NS_MASS;  
+//  M2 = NS_MASS;
 
 //  a1 = 3.0 * xmax / M2 * pow((M1+M2)*(M1+M2)*(M1+xmax),1.0/3.0);
 //  a2 = -3.0 * xmin / M2 * pow((M1+M2)*(M1+M2)*(M1+xmin),1.0/3.0);
@@ -357,14 +409,22 @@ double prob_NS_all(double frac_NS, double M1){
 //  a3 = -9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmax,4.0/3.0);
 //  a4 = 9.0/4.0 * pow(M1+M2,2.0/3.0) / M2 * pow(M1+xmin,4.0/3.0);
   
-  a1 = -3.0/(4.0*M2) * (3.0*M1-xmax) * (M1+xmax) * pow((M1+M2)/(M1+xmax),2.0/3.0);
-  a2 = -3.0/(4.0*M2) * (3.0*M1-xmin) * (M1+xmin) * pow((M1+M2)/(M1+xmin),2.0/3.0);
+//  a1 = -3.0/(4.0*M2) * (3.0*M1-xmax) * (M1+xmax) * pow((M1+M2)/(M1+xmax),2.0/3.0);
+//  a2 = -3.0/(4.0*M2) * (3.0*M1-xmin) * (M1+xmin) * pow((M1+M2)/(M1+xmin),2.0/3.0);
   
+
+
+  xmin = 0.0;
+  xmax = NS_MASS*NS_MASS*NS_MASS/((M1+NS_MASS) * (M1+NS_MASS));
+  M2 = NS_MASS;
+
+  a1 = - 1.0/M2 * sqrt(M2*M2 - pow(xmax,2.0/3.0)*pow(M1+M2,4.0/3.0));
+  a2 = - 1.0/M2 * sqrt(M2*M2 - pow(xmin,2.0/3.0)*pow(M1+M2,4.0/3.0));
+
   return frac_NS*(a1-a2);
 //  return frac_NS*(a1+a2+a3+a4);
+   
 }
-
-
 
 
 
@@ -394,7 +454,8 @@ double eval_M2(double M2, double* model){
   double mu[N_GAUSS];
   double sd[N_GAUSS];
   double w[N_GAUSS];
-  double M1,K,Porb,A,M2_min;
+  double M1,K,Porb,A,M2_min,mf;
+  double Mtot4_3,mf1_3;
   double sini;
   double temp;
   double frac_NS;
@@ -403,72 +464,36 @@ double eval_M2(double M2, double* model){
   M1 = model[0];     // Observed WD mass
   K = model[1];      // Line of sight orbital velocity
   Porb = model[2];   // Orbital period
-  A = model[3];      // Normalization constant
+  mf = model[3];     // Mass function
   M2_min = model[4];  
+  frac_NS = model[5];
+  mf1_3 = model[6];
+
+  Mtot4_3 = pow(M1+M2,4.0/3.0);
+
 
 
   for(i=0;i<N_GAUSS;i++){
-    mu[i] = model[3*i+6];
-    sd[i] = model[3*i+7];
-    w[i] = model[3*i+8];
+    mu[i] = model[3*i+7];
+    sd[i] = model[3*i+8];
+    w[i] = model[3*i+9];
   }
+
 
   temp = 0.0;
   for(i=0;i<N_GAUSS;i++){  
 
-
-//    sini = pow(Porb/(2.0*PI*GGG) * (M1+M2)*(M1+M2), 1.0/3.0) * K / M2;
-    sini = pow((M1+M2)/(M1+M2_min) , 2.0/3.0) * M2_min/M2;
-
-    temp += A * gauss_prob(mu[i],w[i],sd[i],M2) * sini;
-
-//    cout << i << " " << sini << " " << mu[i] << " " << sd[i] << " " << w[i] << " " << temp << endl;
+    if(frac_NS == w[i]){
+      temp += trunc_gauss(mu[i],w[i],sd[i],M2,1.3,2.0) * Mtot4_3 / ((3.0*mf1_3) * M2 * sqrt(M2*M2 - mf1_3*mf1_3 * Mtot4_3));
+    }else {
+      temp += trunc_gauss(mu[i],w[i],sd[i],M2,0.0,1.44) * Mtot4_3 / ((3.0*mf1_3) * M2 * sqrt(M2*M2 - mf1_3*mf1_3 * Mtot4_3));
+    }
+    //    temp += gauss_prob(mu[i],w[i],sd[i],M2) * Mtot4_3 / ((3.0*mf1_3) * M2 * sqrt(M2*M2 - mf1_3*mf1_3 * Mtot4_3));
 
   }
 
   return temp;
 }
-
-void integrate_M2(double M2, double* f, double* df, double* model){
-  int i;
-  
-  double mu[N_GAUSS];
-  double sd[N_GAUSS];
-  double w[N_GAUSS];
-  
-  double M1,K,Porb,A,M2_min;
-  double area;
-
-
-  M1 = model[0];     // Observed WD mass
-  K = model[1];      // Line of sight orbital velocity
-  Porb = model[2];   // Orbital period
-  A = model[3];      // Normalization constant
-  M2_min = model[4]; // Minimum M2
-  area = model[5];   // Value to integrate to
-
-  for(i=0;i<N_GAUSS;i++){
-    mu[i] = model[3*i+6];
-    sd[i] = model[3*i+7];
-    w[i] = model[3*i+8];
-  }
-
-
-  // Integrate [M2_min,M2] to get area, update (*f)
-  if(abs(M2-M2_min) < 1.0e-10){
-    *f = 0.0;
-  } else {
-    qromb(eval_M2,M2_min,M2,1.0e-8,f,model);
-  }
-  
-  // Subtract area we are trying to get to
-  *f = (*f) - area;
-  
-  // Derivative of integral is just the function
-  *df = eval_M2(*f,model);
-
-}
-
 
 
 
@@ -491,7 +516,8 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector
 
 
   // Open data file
-  IN.open("ELM_WD.dat");
+//  IN.open("ELM_WD.dat");
+  IN.open("dist_09_NS.dat");
 
 //  getline(IN,line);
 
@@ -501,10 +527,10 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector
     split(line,data);
 
     
-    Name_temp = data[0];
+    Name_temp = data[2];
     P_temp = strtof(data[1]);
-    K_temp = strtof(data[3]);
-    M1_temp = strtof(data[7]);
+    K_temp = strtof(data[2]);
+    M1_temp = strtof(data[0]);
 
     // Don't worry about non-detections yet
     if (P_temp > 0.001){
@@ -525,7 +551,7 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector
   IN.close();
 
 
-
+/*
   IN.open("ELM_inc.dat");
   
   // Get rid of header
@@ -540,7 +566,7 @@ void read_data(vector<string>& Names,vector<double>& M1,vector<double>& K,vector
   }
 
   IN.close();
-
+*/
 
 }
 
@@ -620,6 +646,19 @@ double gauss_ran(double val, double val_err, long* seed){
 }
 
 
+double trunc_gauss(double val, double w, double val_err, double val_in, double g_min, double g_max){
+
+  double prob, norm;
+
+  prob = gauss_prob(val,w,val_err,val_in);
+  
+  norm = 0.5 * ( erf((g_max-val)/(sqrt(2.0)*val_err)) - erf((g_min-val)/(sqrt(2.0)*val_err)) );
+
+  prob /= norm;
+  
+  return prob;
+
+}
 
 double gauss_prob(double val, double w, double val_err, double val_in){
   return (w/(val_err*sqrt(2.0*PI)) * exp(-(val-val_in)*(val-val_in)/(2.0*val_err*val_err)));
